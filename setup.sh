@@ -80,6 +80,12 @@ cmd deviceidle whitelist +org.smarttube.stable
 # the cached-app freezer stops SmartTube's audio-only background playback (no foreground service);
 # frozen apps keep their memory anyway, so this only costs a little idle CPU. Needs a reboot.
 settings put global cached_apps_freezer disabled
+# the Play Store used ~44% CPU in the background (auto-updates); manual updates still work,
+# and SmartTube/Nuvio are updated by Pi Home anyway
+cmd appops set com.android.vending RUN_ANY_IN_BACKGROUND ignore
+am set-standby-bucket com.android.vending restricted
+# AirScreen idles at ~9% CPU waiting for casts; disabled here (pm enable to bring it back)
+pm disable-user --user 0 com.ionitech.airscreen 2>/dev/null || true
 settings put secure screensaver_enabled 1
 settings put secure screensaver_components $PKG/.ClockDream
 settings put secure screensaver_default_component $PKG/.ClockDream

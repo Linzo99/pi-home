@@ -71,6 +71,22 @@ step: copy `bridge/lg-simplink.sh` to `/system/bin/` (see `setup.sh`) and restar
 - **Requests to the bridge** go through `/data/data/com.sall.pihome/files/request`:
   `sleep`, `sleep-in <seconds>`, `sleep-cancel`, `reboot`, `install <apk paths>`.
 
+## Pi tweaks
+
+`setup.sh` also applies these, all reversible:
+
+| Setting | Why | Undo |
+|---|---|---|
+| `cmd deviceidle whitelist +org.smarttube.stable +com.sall.pihome` | Android 16 cuts background apps' network: SmartTube's background audio failed with `UnknownHostException` | `cmd deviceidle whitelist -<package>` |
+| `settings put global cached_apps_freezer disabled` (needs a reboot) | the freezer stopped SmartTube's audio-only background playback after about a minute | `settings put global cached_apps_freezer device_default` |
+| Play Store restricted (`RUN_ANY_IN_BACKGROUND ignore`, standby bucket `restricted`) | ~44% CPU in the background for automatic updates | `cmd appops set com.android.vending RUN_ANY_IN_BACKGROUND allow; am set-standby-bucket com.android.vending active` |
+| AirScreen disabled | ~9% CPU idling while waiting for casts | `pm enable com.ionitech.airscreen` |
+| Pi Home's uid network policy reset to 0 | LineageOS had installed it with no network access (`REJECT_ALL`) | — |
+
+For SmartTube, pick **480p 30fps avc** in the player's video quality: the Pi 4 decodes H.264 in
+hardware, while VP9 and AV1 fall back to software. Turn on "Lecture en arrière-plan" →
+"Uniquement l'audio" for background playback.
+
 ## Undo
 
 As root on the Pi:
