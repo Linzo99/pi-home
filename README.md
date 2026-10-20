@@ -16,6 +16,29 @@ connected to HDMI 3 of an LG TV. How it works inside, the Pi tweaks and troubles
 
 ---
 
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/02-backdrop.jpg" alt="Highlighted video: its artwork fills the top"><br><sub>Highlighted video: its artwork fills the top</sub></td>
+    <td width="50%"><img src="docs/screenshots/03-row-follows-app.jpg" alt="The row follows the app: Nuvio's films in progress"><br><sub>The row follows the app: Nuvio's films in progress</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/04-app-menu.jpg" alt="App menu (Pause): move, hide, rename, info"><br><sub>App menu (Pause): move, hide, rename, info</sub></td>
+    <td width="50%"><img src="docs/screenshots/05-now-playing.jpg" alt="Now playing, for audio in the background"><br><sub>Now playing, for audio in the background</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/06-sleep-timer.jpg" alt="Sleep timer running: Veille · 2 h"><br><sub>Sleep timer running: « Veille · 2 h »</sub></td>
+    <td width="50%"><img src="docs/screenshots/07-settings-menu.jpg" alt="⚙ Paramètres menu"><br><sub>⚙ Paramètres menu</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/08-infos-pi.jpg" alt="Infos Pi: temperature, memory, storage"><br><sub>Infos Pi: temperature, memory, storage</sub></td>
+    <td width="50%"><img src="docs/screenshots/09-screensaver.jpg" alt="Clock screensaver"><br><sub>Clock screensaver</sub></td>
+  </tr>
+</table>
+
+---
+
 ## The home screen
 
 | | |
@@ -35,27 +58,19 @@ The row under the dock shows what the highlighted app publishes: SmartTube's rec
 Nuvio's films and episodes in progress. Apps that publish nothing show everyone's
 "Continuer à regarder" instead.
 
-![Nuvio highlighted: its films in progress](docs/screenshots/03-row-follows-app.jpg)
-
 Move down onto a card and its artwork fills the top of the screen. OK opens it directly in the
 app. Films and episodes in progress also show the time left.
-
-![A highlighted SmartTube video](docs/screenshots/02-backdrop.jpg)
 
 ### Now playing
 
 When an app keeps playing in the background, for example SmartTube's audio-only mode, a button
 with the title appears in the top bar. OK on it pauses or resumes.
 
-![Now playing](docs/screenshots/05-now-playing.jpg)
-
 ---
 
 ## Organising your apps
 
 Press **Pause** on an app to open its menu.
-
-![App menu](docs/screenshots/04-app-menu.jpg)
 
 - **Déplacer**: the app gets a blue frame; move it with the arrows, OK to drop it. The first 4
   apps make the dock.
@@ -75,8 +90,6 @@ New apps appear at the end of the grid by themselves.
 shows the time left, and its menu adds "Annuler la minuterie". Any button on the remote wakes
 the Pi.
 
-![Sleep timer running: "Veille · 2 h"](docs/screenshots/06-sleep-timer.jpg)
-
 **⟳ Redémarrer** restarts the Pi, after a confirmation.
 
 After midnight, if nothing has been touched for an hour, the Pi goes to sleep by itself.
@@ -84,10 +97,6 @@ After midnight, if nothing has been touched for an hour, the Pi goes to sleep by
 ---
 
 ## Paramètres and Infos Pi
-
-| ⚙ menu | Infos Pi |
-|---|---|
-| ![Settings menu](docs/screenshots/07-settings-menu.jpg) | ![Infos Pi](docs/screenshots/08-infos-pi.jpg) |
 
 - **Paramètres Android**: the usual Android TV settings.
 - **Infos Pi**: processor temperature, free memory and storage, IP address, time since the last
@@ -115,8 +124,6 @@ especially for Fajr and Isha.
 
 After 15 minutes without input, a thin clock appears over the last glow colour. It moves every
 minute so nothing burns into the TV. Any button brings back the home screen.
-
-![Screensaver](docs/screenshots/09-screensaver.jpg)
 
 ---
 
