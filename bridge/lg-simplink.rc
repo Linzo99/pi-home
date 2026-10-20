@@ -1,0 +1,9 @@
+# LG SimpLink remote bridge (replaces Android HDMI-CEC for this old LG TV)
+service lg-simplink /system/bin/sh /system/bin/lg-simplink.sh
+    user root
+    group root
+    seclabel u:r:su:s0
+    disabled
+
+on property:sys.boot_completed=1
+    start lg-simplink

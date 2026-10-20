@@ -1,0 +1,4 @@
+build/
+# signing key: back it up separately, never publish it
+pihome.keystore
+.DS_Store
