@@ -77,6 +77,9 @@ service call netpolicy 1 i32 $UID_ i32 0 >/dev/null
 # background playback (UnknownHostException) and Pi Home's update and prayer-time downloads
 cmd deviceidle whitelist +$PKG
 cmd deviceidle whitelist +org.smarttube.stable
+# the cached-app freezer stops SmartTube's audio-only background playback (no foreground service);
+# frozen apps keep their memory anyway, so this only costs a little idle CPU. Needs a reboot.
+settings put global cached_apps_freezer disabled
 settings put secure screensaver_enabled 1
 settings put secure screensaver_components $PKG/.ClockDream
 settings put secure screensaver_default_component $PKG/.ClockDream
