@@ -73,6 +73,10 @@ appops set $PKG SYSTEM_ALERT_WINDOW allow
 appops set $PKG WRITE_SETTINGS allow
 # LineageOS can install an app with no network access (uid policy REJECT_ALL); setUidPolicy(uid, 0)
 service call netpolicy 1 i32 $UID_ i32 0 >/dev/null
+# Android cuts the network of apps it considers in the background, which breaks SmartTube's
+# background playback (UnknownHostException) and Pi Home's update and prayer-time downloads
+cmd deviceidle whitelist +$PKG
+cmd deviceidle whitelist +org.smarttube.stable
 settings put secure screensaver_enabled 1
 settings put secure screensaver_components $PKG/.ClockDream
 settings put secure screensaver_default_component $PKG/.ClockDream
