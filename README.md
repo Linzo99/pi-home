@@ -35,22 +35,19 @@ The row under the dock shows what the highlighted app publishes: SmartTube's rec
 Nuvio's films and episodes in progress. Apps that publish nothing show everyone's
 "Continuer à regarder" instead.
 
-| SmartTube highlighted | Nuvio highlighted |
-|---|---|
-| ![SmartTube row](docs/screenshots/01-home.jpg) | ![Nuvio row](docs/screenshots/03-row-follows-app.jpg) |
+![Nuvio highlighted: its films in progress](docs/screenshots/03-row-follows-app.jpg)
 
-Move down onto a card and its artwork fills the top of the screen. OK opens it directly in the app.
+Move down onto a card and its artwork fills the top of the screen. OK opens it directly in the
+app. Films and episodes in progress also show the time left.
 
-| A SmartTube video | A Nuvio film, with the time left |
-|---|---|
-| ![Backdrop](docs/screenshots/02-backdrop.jpg) | ![Nuvio card](docs/screenshots/04-nuvio-card.jpg) |
+![A highlighted SmartTube video](docs/screenshots/02-backdrop.jpg)
 
 ### Now playing
 
 When an app keeps playing in the background, for example SmartTube's audio-only mode, a button
 with the title appears in the top bar. OK on it pauses or resumes.
 
-![Now playing](docs/screenshots/09-now-playing.jpg)
+![Now playing](docs/screenshots/05-now-playing.jpg)
 
 ---
 
@@ -58,20 +55,15 @@ with the title appears in the top bar. OK on it pauses or resumes.
 
 Press **Pause** on an app to open its menu.
 
-| App menu | Moving an app (blue frame) |
-|---|---|
-| ![App menu](docs/screenshots/05-app-menu.jpg) | ![Move mode](docs/screenshots/06-move-mode.jpg) |
+![App menu](docs/screenshots/04-app-menu.jpg)
 
-- **Déplacer**: move it with the arrows, OK to drop it. The first 4 apps make the dock.
+- **Déplacer**: the app gets a blue frame; move it with the arrows, OK to drop it. The first 4
+  apps make the dock.
 - **Masquer**: hides it from the home screen.
 - **Renommer**: gives it another name. "Nom d'origine" restores the original.
 - **Infos de l'app**: Android's page for the app (storage, permissions, force stop).
 
-Hidden apps go into **Apps masquées**, at the end of the grid. OK on it brings one back.
-
-| Hidden apps tile | Bringing one back |
-|---|---|
-| ![Hidden apps](docs/screenshots/07-hidden-apps.jpg) | ![Hidden apps menu](docs/screenshots/08-hidden-apps-menu.jpg) |
+Hidden apps go into an **Apps masquées** tile at the end of the grid. OK on it brings one back.
 
 New apps appear at the end of the grid by themselves.
 
@@ -79,12 +71,11 @@ New apps appear at the end of the grid by themselves.
 
 ## Sleep, timer, restart
 
-**🌙 Veille** puts the Pi to sleep now or later. While a timer runs, the button shows the time
-left, and its menu adds "Annuler la minuterie". Any button on the remote wakes the Pi.
+**🌙 Veille** puts the Pi to sleep now, or in 30 min, 1 h or 2 h. While a timer runs, the button
+shows the time left, and its menu adds "Annuler la minuterie". Any button on the remote wakes
+the Pi.
 
-| Sleep menu | Timer running |
-|---|---|
-| ![Sleep menu](docs/screenshots/10-sleep-menu.jpg) | ![Sleep timer](docs/screenshots/11-sleep-timer.jpg) |
+![Sleep timer running: "Veille · 2 h"](docs/screenshots/06-sleep-timer.jpg)
 
 **⟳ Redémarrer** restarts the Pi, after a confirmation.
 
@@ -96,7 +87,7 @@ After midnight, if nothing has been touched for an hour, the Pi goes to sleep by
 
 | ⚙ menu | Infos Pi |
 |---|---|
-| ![Settings menu](docs/screenshots/12-settings-menu.jpg) | ![Infos Pi](docs/screenshots/13-infos-pi.jpg) |
+| ![Settings menu](docs/screenshots/07-settings-menu.jpg) | ![Infos Pi](docs/screenshots/08-infos-pi.jpg) |
 
 - **Paramètres Android**: the usual Android TV settings.
 - **Infos Pi**: processor temperature, free memory and storage, IP address, time since the last
@@ -110,10 +101,9 @@ After midnight, if nothing has been touched for an hour, the Pi goes to sleep by
 
 ## Prayer times
 
-The next prayer shows under the weather. At prayer time, a banner appears for 30 seconds, even
-over SmartTube or Nuvio.
-
-![Prayer reminder](docs/screenshots/15-prayer-reminder.jpg)
+The next prayer shows under the weather, at the top left of the home screen. At prayer time, a
+banner "C'est l'heure de la prière · Dhuhr 12:55" appears for 30 seconds, even over SmartTube or
+Nuvio.
 
 Times come from [Aladhan](https://aladhan.com) with the Muslim World League method, for the
 location of your internet connection (Dakar). Mosques sometimes differ by a few minutes,
@@ -126,7 +116,7 @@ especially for Fajr and Isha.
 After 15 minutes without input, a thin clock appears over the last glow colour. It moves every
 minute so nothing burns into the TV. Any button brings back the home screen.
 
-![Screensaver](docs/screenshots/14-screensaver.jpg)
+![Screensaver](docs/screenshots/09-screensaver.jpg)
 
 ---
 
