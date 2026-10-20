@@ -407,12 +407,16 @@ public class MainActivity extends Activity {
         hello.addView(greeting);
         weather = text(12, 0x99FFFFFF, "sans-serif");
         weather.setCompoundDrawablePadding(dp(6));
+        weather.setSingleLine(true);
+        weather.setEllipsize(TextUtils.TruncateAt.END);
         weather.setVisibility(View.GONE);
         LinearLayout.LayoutParams wp = new LinearLayout.LayoutParams(-2, -2);
         wp.topMargin = dp(4);
         hello.addView(weather, wp);
         prayerLine = text(12, 0x99FFFFFF, "sans-serif");
         prayerLine.setCompoundDrawablePadding(dp(6));
+        prayerLine.setSingleLine(true);
+        prayerLine.setEllipsize(TextUtils.TruncateAt.END);
         prayerLine.setVisibility(View.GONE);
         LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-2, -2);
         pp.topMargin = dp(3);
@@ -420,7 +424,7 @@ public class MainActivity extends Activity {
         bar.addView(hello, new LinearLayout.LayoutParams(0, -2, 1f));
 
         nowPill = pill(R.drawable.ic_pause, "", false);
-        nowPill.setMaxWidth(dp(260));
+        nowPill.setMaxWidth(dp(220));
         nowPill.setSingleLine(true);
         nowPill.setEllipsize(TextUtils.TruncateAt.END);
         nowPill.setVisibility(View.GONE);

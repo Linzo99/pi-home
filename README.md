@@ -1,104 +1,200 @@
 # Pi Home
 
-A lightweight Apple TV-style launcher for a Raspberry Pi 4 running Android TV (KonstaKANG's
-LineageOS build), plus a bridge that lets an old LG TV remote control the Pi over HDMI-CEC.
+An Apple TV-style home screen for a Raspberry Pi 4 running Android TV, controlled with the TV's
+own LG remote.
 
-## What's in here
+![Home screen](docs/screenshots/01-home.jpg)
 
-| Path | What it is |
+- **Launcher**: a single 60 KB app, plain Java with no libraries. Dock, a row that follows the
+  highlighted app, weather, prayer times, a sleep timer, a screensaver and app updates.
+- **LG remote bridge**: an old LG TV only passes its remote to devices it recognises as LG. The
+  bridge makes the Pi answer as one, so the TV remote drives Android.
+
+Built for a Pi 4 (2 GB) with [KonstaKANG's LineageOS Android TV](https://konstakang.com/devices/rpi4/),
+connected to HDMI 3 of an LG TV. How it works inside, the Pi tweaks and troubleshooting are in
+[docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md).
+
+---
+
+## The home screen
+
+| | |
 |---|---|
-| `src/`, `res/`, `AndroidManifest.xml` | The launcher: plain Java, no AndroidX, about 60 KB |
-| `bridge/lg-simplink.sh` | Root service: speaks LG SimpLink to the TV and turns its remote into key presses. Also carries out the launcher's sleep, restart and app-install requests |
-| `bridge/lg-simplink.rc` | Starts the bridge at boot |
-| `privapp-permissions-pihome.xml` | Whitelist for the launcher's privileged permissions |
-| `build.sh` | Builds the APK without Gradle (aapt2, javac, d8, apksigner) |
-| `setup.sh` | Installs everything on a fresh Pi |
-| `pihome.keystore` | Signing key. **Back it up**: updates must be signed with the same key. It is not in Git |
+| **Top left** | Greeting (Bonjour, Bon après-midi, Bonsoir), weather, next prayer |
+| **Top right** | Now playing (when something plays in the background), Wi-Fi, 🌙 Veille, ⟳ Redémarrer, ⚙ Paramètres, clock |
+| **Title** | Name of the highlighted app, or of the highlighted video |
+| **Dock** | Your first 4 apps |
+| **Row** | Content from the highlighted app |
+| **Toutes les apps** | Every other app, plus the hidden ones |
 
-## Features
+The background glows in the colour of the highlighted app. From 23:00 to 06:00 the screen dims.
 
-- Dock of 4 favourite apps and a grid of the rest; focused app's name and a glow in its colour
-- Row under the dock that follows the highlighted app: SmartTube's "Recommandé", Nuvio's
-  "Continuer à regarder", or everyone's "continue watching" for apps that publish nothing
-- Backdrop of the highlighted card's artwork
-- "Now playing" button for media playing in the background, with play/pause
-- Pause menu on an app: move, hide, rename, app info
-- Greeting, weather (Open-Meteo, location from ipapi.co), next prayer time for the location
-  (Aladhan, Muslim World League) with an on-screen reminder
-- Sleep now or on a timer, restart, automatic sleep after an hour idle past midnight
-- Clock screensaver that drifts to avoid burn-in; dims the home screen 23:00–06:00
-- ⚙ menu: Android settings, Infos Pi (temperature, memory, storage, IP, uptime), update check,
-  prayer reminder and navigation sounds switches
-- Updates for SmartTube and Nuvio from their GitHub releases, installed silently by the bridge
+### A row that follows the app
 
-## LG remote
+The row under the dock shows what the highlighted app publishes: SmartTube's recommendations,
+Nuvio's films and episodes in progress. Apps that publish nothing show everyone's
+"Continuer à regarder" instead.
 
-| Button | Does |
+| SmartTube highlighted | Nuvio highlighted |
 |---|---|
-| Arrows, OK, Back | Navigate, select, back |
-| Play | Play; on the Home screen, opens the highlighted app |
-| Pause | Play/pause; on the Home screen, opens the app menu |
-| Stop | Home |
-| EXIT, colours, numbers | Nothing: the TV keeps them |
+| ![SmartTube row](docs/screenshots/01-home.jpg) | ![Nuvio row](docs/screenshots/03-row-follows-app.jpg) |
+
+Move down onto a card and its artwork fills the top of the screen. OK opens it directly in the app.
+
+| A SmartTube video | A Nuvio film, with the time left |
+|---|---|
+| ![Backdrop](docs/screenshots/02-backdrop.jpg) | ![Nuvio card](docs/screenshots/04-nuvio-card.jpg) |
+
+### Now playing
+
+When an app keeps playing in the background, for example SmartTube's audio-only mode, a button
+with the title appears in the top bar. OK on it pauses or resumes.
+
+![Now playing](docs/screenshots/09-now-playing.jpg)
+
+---
+
+## Organising your apps
+
+Press **Pause** on an app to open its menu.
+
+| App menu | Moving an app (blue frame) |
+|---|---|
+| ![App menu](docs/screenshots/05-app-menu.jpg) | ![Move mode](docs/screenshots/06-move-mode.jpg) |
+
+- **Déplacer**: move it with the arrows, OK to drop it. The first 4 apps make the dock.
+- **Masquer**: hides it from the home screen.
+- **Renommer**: gives it another name. "Nom d'origine" restores the original.
+- **Infos de l'app**: Android's page for the app (storage, permissions, force stop).
+
+Hidden apps go into **Apps masquées**, at the end of the grid. OK on it brings one back.
+
+| Hidden apps tile | Bringing one back |
+|---|---|
+| ![Hidden apps](docs/screenshots/07-hidden-apps.jpg) | ![Hidden apps menu](docs/screenshots/08-hidden-apps-menu.jpg) |
+
+New apps appear at the end of the grid by themselves.
+
+---
+
+## Sleep, timer, restart
+
+**🌙 Veille** puts the Pi to sleep now or later. While a timer runs, the button shows the time
+left, and its menu adds "Annuler la minuterie". Any button on the remote wakes the Pi.
+
+| Sleep menu | Timer running |
+|---|---|
+| ![Sleep menu](docs/screenshots/10-sleep-menu.jpg) | ![Sleep timer](docs/screenshots/11-sleep-timer.jpg) |
+
+**⟳ Redémarrer** restarts the Pi, after a confirmation.
+
+After midnight, if nothing has been touched for an hour, the Pi goes to sleep by itself.
+
+---
+
+## Paramètres and Infos Pi
+
+| ⚙ menu | Infos Pi |
+|---|---|
+| ![Settings menu](docs/screenshots/12-settings-menu.jpg) | ![Infos Pi](docs/screenshots/13-infos-pi.jpg) |
+
+- **Paramètres Android**: the usual Android TV settings.
+- **Infos Pi**: processor temperature, free memory and storage, IP address, time since the last
+  restart. Refreshes every 2 seconds. Up to about 75 °C is normal; the Pi slows itself down from
+  80 °C.
+- **Rechercher des mises à jour**: checks SmartTube and Nuvio now (see below).
+- **Rappel des prières**: turns the prayer reminder on or off.
+- **Sons de navigation**: Android's click sounds.
+
+---
+
+## Prayer times
+
+The next prayer shows under the weather. At prayer time, a banner appears for 30 seconds, even
+over SmartTube or Nuvio.
+
+![Prayer reminder](docs/screenshots/15-prayer-reminder.jpg)
+
+Times come from [Aladhan](https://aladhan.com) with the Muslim World League method, for the
+location of your internet connection (Dakar). Mosques sometimes differ by a few minutes,
+especially for Fajr and Isha.
+
+---
+
+## Screensaver
+
+After 15 minutes without input, a thin clock appears over the last glow colour. It moves every
+minute so nothing burns into the TV. Any button brings back the home screen.
+
+![Screensaver](docs/screenshots/14-screensaver.jpg)
+
+---
+
+## App updates
+
+SmartTube and Nuvio don't come from the Play Store, so nothing updates them. Pi Home checks
+their GitHub releases 20 seconds after the Pi starts, then every 12 hours. When there's a new
+version, a **⬆** button appears in the top bar: choose an app, or "Tout mettre à jour". It
+downloads the Pi 4 version and installs it silently. Settings and logins are kept.
+
+Installing an update closes the app, so it stops anything it was playing.
+
+---
+
+## The LG remote
+
+| Button | On the Pi |
+|---|---|
+| ↑ ↓ ← → | Navigate; hold to scroll |
+| **OK** | Select |
+| **Play** ▶ | Play in apps; opens the highlighted app on the home screen |
+| **Pause** ⏸ | Play/pause in apps; opens the app menu on the home screen |
+| **Stop** ■ | Home |
+| **Back** | Back |
+| Skip ⏭ | Next |
+| EXIT, colours, numbers | Nothing: the TV keeps these |
+
+If the remote stops responding, switch the TV input away from HDMI 3 and back.
+
+---
+
+## Recommended SmartTube settings
+
+- **Video quality** (in the player): **480p 30fps avc**. The Pi 4 decodes AVC (H.264) in
+  hardware; VP9 and AV1 fall back to the processor, which runs hotter and can stutter. Take 60 fps
+  only for sport or games.
+- **Paramètres → Lecture en arrière-plan → Uniquement l'audio**: keeps the sound playing after
+  Stop ■, and shows the now-playing button.
+
+---
 
 ## Build and install
 
+You need the Android SDK (build-tools 36.1.0, platform 36) and Android Studio's bundled JDK, as
+installed by Android Studio on macOS. There is no Gradle.
+
 ```sh
-./build.sh            # build build/pihome.apk
-./build.sh install    # build and install over the Pi's copy (keeps settings)
+./build.sh            # builds build/pihome.apk
+./build.sh install    # builds and installs over the Pi's copy, keeping your settings
 ./setup.sh            # full install on a fresh Pi: system files, reboot, settings
 ```
 
-`PI_HOST` overrides the Pi's address (default `192.168.1.116:5555`). The bridge has no build
-step: copy `bridge/lg-simplink.sh` to `/system/bin/` (see `setup.sh`) and restart it with
-`stop lg-simplink; start lg-simplink` as root.
+`PI_HOST` changes the Pi's address (default `192.168.1.116:5555`).
 
-## Things to know
+Updating Pi Home restarts the home screen, which also stops SmartTube's background audio.
 
-- **Privileged permissions.** The launcher is a priv-app (`/system/priv-app/PiHome`) to read other
-  apps' TV channels (`ACCESS_ALL_EPG_DATA`) and media sessions (`MEDIA_CONTENT_CONTROL`). The
-  build enforces the whitelist: adding a privileged permission without listing it in
-  `privapp-permissions-pihome.xml` stops the Pi from booting. Update the whitelist and the system
-  copy together, then reboot.
-- **LG SimpLink.** The TV only forwards its remote to a device that claims LG's vendor ID and
-  answers its handshake the way libcec's `CSLCommandHandler` does. The bridge presents the Pi as an
-  LG recording device (logical address 1, physical address 3.0.0.0, i.e. HDMI 3), so Android's
-  own HDMI-CEC is switched off.
-- **uinput quirk.** Android's `uinput` tool runs each command only when the next one arrives, so
-  every key event is followed by a no-op, and key-ups wait with a real `sleep` (its `delay`
-  command doesn't hold events back).
-- **If the remote stops responding,** switch the TV input away from HDMI 3 and back.
-- **Requests to the bridge** go through `/data/data/com.sall.pihome/files/request`:
-  `sleep`, `sleep-in <seconds>`, `sleep-cancel`, `reboot`, `install <apk paths>`.
+Back up **`pihome.keystore`**. It signs the app, and updates must use the same key. It's
+deliberately left out of Git.
 
-## Pi tweaks
+## Project layout
 
-`setup.sh` also applies these, all reversible:
-
-| Setting | Why | Undo |
-|---|---|---|
-| `cmd deviceidle whitelist +org.smarttube.stable +com.sall.pihome` | Android 16 cuts background apps' network: SmartTube's background audio failed with `UnknownHostException` | `cmd deviceidle whitelist -<package>` |
-| `settings put global cached_apps_freezer disabled` (needs a reboot) | the freezer stopped SmartTube's audio-only background playback after about a minute | `settings put global cached_apps_freezer device_default` |
-| Play Store restricted (`RUN_ANY_IN_BACKGROUND ignore`, standby bucket `restricted`) | ~44% CPU in the background for automatic updates | `cmd appops set com.android.vending RUN_ANY_IN_BACKGROUND allow; am set-standby-bucket com.android.vending active` |
-| AirScreen disabled | ~9% CPU idling while waiting for casts | `pm enable com.ionitech.airscreen` |
-| Pi Home's uid network policy reset to 0 | LineageOS had installed it with no network access (`REJECT_ALL`) | — |
-
-For SmartTube, pick **480p 30fps avc** in the player's video quality: the Pi 4 decodes H.264 in
-hardware, while VP9 and AV1 fall back to software. Turn on "Lecture en arrière-plan" →
-"Uniquement l'audio" for background playback.
-
-## Undo
-
-As root on the Pi:
-
-```sh
-mount -o remount,rw /
-rm -r /system/priv-app/PiHome /system/etc/permissions/privapp-permissions-pihome.xml
-rm /system/bin/lg-simplink.sh /system/etc/init/lg-simplink.rc
-mount -o remount,ro /
-cmd hdmi_control cec_setting set hdmi_cec_enabled 1
-pm uninstall com.sall.pihome
-reboot
-```
-
-Install another launcher first, or Android TV falls back to its own setup screen.
+| Path | What it is |
+|---|---|
+| `src/com/sall/pihome/` | The launcher. `MainActivity` is the home screen; `WatchNext`, `Weather`, `Prayers`, `Updates`, `PiInfo` fetch its data; `ClockDream` is the screensaver; `GlowView` draws the glow |
+| `res/` | Icons and the theme |
+| `AndroidManifest.xml` | Permissions, the home screen and the screensaver |
+| `bridge/lg-simplink.sh` | The LG remote bridge, which also carries out sleep, restart and installs |
+| `bridge/lg-simplink.rc` | Starts the bridge at boot |
+| `privapp-permissions-pihome.xml` | Allows the launcher's two system permissions |
+| `build.sh`, `setup.sh` | Build, and install on a fresh Pi |
+| `docs/` | This guide's screenshots and [HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) |
