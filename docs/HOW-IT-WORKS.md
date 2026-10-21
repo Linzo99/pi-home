@@ -88,12 +88,13 @@ The bridge logs what the TV sends to `/data/local/tmp/slb.log`.
 
 ## The launcher's permissions
 
-Pi Home is a privileged system app so it can read two kinds of data that belong to other apps:
+Pi Home is a privileged system app so it can read three kinds of data that belong to other apps:
 
 | Permission | For |
 |---|---|
 | `ACCESS_ALL_EPG_DATA` | other apps' TV channels and "continue watching" |
 | `MEDIA_CONTENT_CONTROL` | other apps' media sessions (now playing) |
+| `PACKAGE_USAGE_STATS` | every app's data usage, for Infos Pi |
 
 The build enforces the whitelist (`ro.control_privapp_permissions=enforce`). **Adding a
 privileged permission to the manifest without listing it in `privapp-permissions-pihome.xml`

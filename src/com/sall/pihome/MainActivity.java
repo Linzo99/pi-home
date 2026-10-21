@@ -1259,10 +1259,19 @@ public class MainActivity extends Activity {
         body.setPadding(dp(6), dp(8), dp(6), dp(10));
         card.addView(body);
         card.addView(menuButton("Fermer", null));
+        String[] usage = {"Données : …"};
         Runnable refresh = new Runnable() {
+            int ticks;
+
             @Override
             public void run() {
                 if (!card.isAttachedToWindow()) return;
+                if (ticks++ % 30 == 0) {
+                    io.execute(() -> {
+                        String u = PiInfo.dataUsage(MainActivity.this);
+                        ui.post(() -> usage[0] = u);
+                    });
+                }
                 float t = PiInfo.temperature();
                 String temp = Float.isNaN(t) ? "inconnue"
                         : String.format(java.util.Locale.FRANCE, "%.1f °C%s", t, t >= 80 ? " · trop chaud !" : t >= 70 ? " · chaud" : "");
@@ -1271,6 +1280,7 @@ public class MainActivity extends Activity {
                         + "\nStockage : " + PiInfo.storage()
                         + "\nAdresse IP : " + PiInfo.address(MainActivity.this)
                         + "\nAllumé depuis : " + PiInfo.uptime()
+                        + "\n" + usage[0]
                         + "\n" + PiInfo.system());
                 ui.postDelayed(this, 2000);
             }

@@ -100,7 +100,8 @@ After midnight, if nothing has been touched for an hour, the Pi goes to sleep by
 
 - **Paramètres Android**: the usual Android TV settings.
 - **Infos Pi**: processor temperature, free memory and storage, IP address, time since the last
-  restart. Refreshes every 2 seconds. Up to about 75 °C is normal; the Pi slows itself down from
+  restart, and the data used today and this month with the 3 apps that used the most. Refreshes
+  every 2 seconds; Android only saves data figures about every 30 minutes. Up to about 75 °C is normal; the Pi slows itself down from
   80 °C.
 - **Rechercher des mises à jour**: checks SmartTube and Nuvio now (see below).
 - **Rappel des prières**: turns the prayer reminder on or off.
@@ -192,6 +193,6 @@ deliberately left out of Git.
 | `AndroidManifest.xml` | Permissions, the home screen and the screensaver |
 | `bridge/lg-simplink.sh` | The LG remote bridge, which also carries out sleep, restart and installs |
 | `bridge/lg-simplink.rc` | Starts the bridge at boot |
-| `privapp-permissions-pihome.xml` | Allows the launcher's two system permissions |
+| `privapp-permissions-pihome.xml` | Allows the launcher's three system permissions |
 | `build.sh`, `setup.sh` | Build, and install on a fresh Pi |
 | `docs/` | This guide's screenshots and [HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) |

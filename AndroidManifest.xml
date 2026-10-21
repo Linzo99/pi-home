@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.sall.pihome"
-    android:versionCode="16"
-    android:versionName="1.15">
+    android:versionCode="17"
+    android:versionName="1.16">
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -16,6 +16,8 @@
     <uses-permission android:name="com.android.providers.tv.permission.ACCESS_ALL_EPG_DATA" />
     <!-- "now playing": other apps' media sessions; privileged, also whitelisted -->
     <uses-permission android:name="android.permission.MEDIA_CONTENT_CONTROL" />
+    <!-- data usage in Infos Pi (NetworkStatsManager for every app); privileged, also whitelisted -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
     <!-- the prayer reminder banner, shown over other apps -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- the navigation sounds switch -->
