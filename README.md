@@ -56,7 +56,7 @@ The background glows in the colour of the highlighted app. From 23:00 to 06:00 t
 
 The row under the dock shows what the highlighted app publishes: SmartTube's recommendations,
 Nuvio's films and episodes in progress. Apps that publish nothing show everyone's
-"Continuer à regarder" instead.
+"Continuer à regarder" instead, leaving out the apps you've hidden.
 
 Move down onto a card and its artwork fills the top of the screen. OK opens it directly in the
 app. Films and episodes in progress also show the time left.

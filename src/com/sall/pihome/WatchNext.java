@@ -31,8 +31,11 @@ final class WatchNext {
         int color;
     }
 
-    /** needs ACCESS_ALL_EPG_DATA to see other apps' rows; returns an empty list without it */
-    static List<Item> load(Context c) {
+    /**
+     * everyone's "continue watching" except the apps in skip (the hidden ones); needs
+     * ACCESS_ALL_EPG_DATA to see other apps' rows, returns an empty list without it
+     */
+    static List<Item> load(Context c, Set<String> skip) {
         List<Item> out = new ArrayList<>();
         String[] cols = {"package_name", "title", "episode_title", "season_display_number",
                 "episode_display_number", "poster_art_uri", "thumbnail_uri", "intent_uri",
@@ -44,6 +47,7 @@ final class WatchNext {
                 if (!cur.isNull(10) && cur.getInt(10) == 0) continue;
                 Item it = new Item();
                 it.pkg = cur.getString(0);
+                if (skip.contains(it.pkg)) continue;
                 it.title = cur.getString(1);
                 it.intentUri = cur.getString(7);
                 if (it.title == null || it.intentUri == null) continue;
@@ -72,7 +76,7 @@ final class WatchNext {
         Row row = new Row();
         Set<String> seen = new HashSet<>();
         List<String> sections = new ArrayList<>();
-        for (Item it : load(c)) {
+        for (Item it : load(c, new HashSet<>())) {
             if (!pkg.equals(it.pkg)) continue;
             row.items.add(it);
             seen.add(it.title);

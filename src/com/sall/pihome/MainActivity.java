@@ -798,7 +798,7 @@ public class MainActivity extends Activity {
                 // apps that publish nothing show everyone's "continue watching" instead
                 r = new WatchNext.Row();
                 r.label = "Continuer à regarder";
-                r.items = WatchNext.load(this);
+                r.items = WatchNext.load(this, new HashSet<>(Arrays.asList(prefs.getString("hidden", "").split(","))));
             }
             WatchNext.Row row = r;
             ui.post(() -> {
