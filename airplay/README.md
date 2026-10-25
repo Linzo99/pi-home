@@ -1,8 +1,7 @@
 # Pi AirPlay
 
-A minimal AirPlay screen-mirroring receiver for the Raspberry Pi 4 Android TV box from
-[Pi Home](https://github.com/Linzo99/pi-home). No ads, no premium screen, nothing running while
-unused.
+A minimal AirPlay screen-mirroring receiver for the Raspberry Pi 4 Android TV box, part of
+[Pi Home](../README.md). No ads, no premium screen, nothing running while unused.
 
 On the Mac or iPhone, open **Screen Mirroring** and choose **Pi**. The TV switches to the mirrored
 screen by itself. On the Mac, "Use as separate display" extends the desktop onto the TV.
@@ -34,6 +33,8 @@ You need Android Studio (for its JDK and SDK) and the Pi on ADB.
 ```sh
 ./install.sh          # builds, installs and sets up the Pi at PI_HOST (default 192.168.1.116:5555)
 ```
+
+The full Pi setup (`../setup.sh`) runs this too.
 
 Logs: `adb logcat -s PiAirPlay`.
 

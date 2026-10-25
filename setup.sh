@@ -84,7 +84,8 @@ settings put global cached_apps_freezer disabled
 # and SmartTube/Nuvio are updated by Pi Home anyway
 cmd appops set com.android.vending RUN_ANY_IN_BACKGROUND ignore
 am set-standby-bucket com.android.vending restricted
-# AirScreen idles at ~9% CPU waiting for casts; disabled here (pm enable to bring it back)
+# AirScreen idles at ~9% CPU and shows premium screens; Pi AirPlay (airplay/) replaces it
+# (pm enable to bring it back)
 pm disable-user --user 0 com.ionitech.airscreen 2>/dev/null || true
 settings put secure screensaver_enabled 1
 settings put secure screensaver_components $PKG/.ClockDream
@@ -92,9 +93,13 @@ settings put secure screensaver_default_component $PKG/.ClockDream
 am start -a android.intent.action.MAIN -c android.intent.category.HOME >/dev/null
 "
 
+echo "== AirPlay receiver"
+PI_HOST="$PI" ./airplay/install.sh
+
 echo "== checking"
 a shell "
 echo \"bridge: \$(getprop init.svc.lg-simplink)\"
+echo \"airplay: \$(pidof com.sall.piairplay >/dev/null && echo running || echo stopped)\"
 dumpsys package $PKG | grep -E '(ACCESS_ALL_EPG_DATA|MEDIA_CONTENT_CONTROL): granted' | sort -u
 echo \"home: \$(cmd package resolve-activity --brief -c android.intent.category.HOME -a android.intent.action.MAIN | tail -1)\"
 "

@@ -9,6 +9,8 @@ own LG remote.
   highlighted app, weather, prayer times, a sleep timer, a screensaver and app updates.
 - **LG remote bridge**: an old LG TV only passes its remote to devices it recognises as LG. The
   bridge makes the Pi answer as one, so the TV remote drives Android.
+- **AirPlay receiver**: mirror a Mac or iPhone onto the TV, or use the TV as a second Mac screen.
+  No ads, no premium screen.
 
 Built for a Pi 4 (2 GB) with [KonstaKANG's LineageOS Android TV](https://konstakang.com/devices/rpi4/),
 connected to HDMI 3 of an LG TV. How it works inside, the Pi tweaks and troubleshooting are in
@@ -128,6 +130,21 @@ minute so nothing burns into the TV. Any button brings back the home screen.
 
 ---
 
+## AirPlay
+
+On the Mac or iPhone, open **Screen Mirroring** and choose **Pi**. The TV switches to the mirrored
+screen by itself, with the sound. On the Mac, "Use as separate display" extends the desktop onto
+the TV. **Back** on the remote leaves the mirrored screen; stop mirroring on the Mac or iPhone.
+
+The **AirPlay** tile shows « AirPlay prêt » with these instructions. The receiver starts with the
+Pi and uses no CPU while nothing is mirrored.
+
+The Wi-Fi sets the speed: the picture goes Mac → router → Pi. An Ethernet cable for the Pi, the
+router at 40 MHz channel width, or 1280 × 720 for the TV in the Mac's display settings all make it
+smoother. How it works: [airplay/README.md](airplay/README.md).
+
+---
+
 ## App updates
 
 SmartTube and Nuvio don't come from the Play Store, so nothing updates them. Pi Home checks
@@ -174,15 +191,16 @@ installed by Android Studio on macOS. There is no Gradle.
 ```sh
 ./build.sh            # builds build/pihome.apk
 ./build.sh install    # builds and installs over the Pi's copy, keeping your settings
-./setup.sh            # full install on a fresh Pi: system files, reboot, settings
+./setup.sh            # full install on a fresh Pi: system files, reboot, settings, AirPlay
+airplay/install.sh    # builds and installs only the AirPlay receiver (uses Gradle)
 ```
 
 `PI_HOST` changes the Pi's address (default `192.168.1.116:5555`).
 
 Updating Pi Home restarts the home screen, which also stops SmartTube's background audio.
 
-Back up **`pihome.keystore`**. It signs the app, and updates must use the same key. It's
-deliberately left out of Git.
+Back up **`pihome.keystore`** and **`airplay/piairplay.keystore`**. They sign the two apps, and
+updates must use the same keys. They're deliberately left out of Git.
 
 ## Project layout
 
@@ -194,5 +212,6 @@ deliberately left out of Git.
 | `bridge/lg-simplink.sh` | The LG remote bridge, which also carries out sleep, restart and installs |
 | `bridge/lg-simplink.rc` | Starts the bridge at boot |
 | `privapp-permissions-pihome.xml` | Allows the launcher's three system permissions |
+| `airplay/` | The AirPlay receiver, a separate app built with Gradle; see its [README](airplay/README.md) |
 | `build.sh`, `setup.sh` | Build, and install on a fresh Pi |
 | `docs/` | This guide's screenshots and [HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) |

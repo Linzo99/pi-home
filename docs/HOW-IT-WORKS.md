@@ -131,9 +131,18 @@ Apple TV registers a channel but publishes nothing: its background workers fail 
 | `cmd deviceidle whitelist +org.smarttube.stable +com.sall.pihome` | Android 16 cuts background apps' network; SmartTube's background audio failed with `UnknownHostException` | `cmd deviceidle whitelist -<package>` |
 | `settings put global cached_apps_freezer disabled`, then reboot | the freezer stopped SmartTube's background audio after about a minute. Frozen apps keep their memory anyway, so this only costs a little idle CPU | `… cached_apps_freezer device_default` |
 | Play Store `RUN_ANY_IN_BACKGROUND ignore`, standby bucket `restricted` | ~44% CPU in the background for automatic updates | `cmd appops set com.android.vending RUN_ANY_IN_BACKGROUND allow; am set-standby-bucket com.android.vending active` |
-| AirScreen disabled | ~9% CPU waiting for casts | `pm enable com.ionitech.airscreen` |
+| AirScreen disabled | ~9% CPU waiting for casts, and premium screens; Pi AirPlay replaces it | `pm enable com.ionitech.airscreen` |
+| Pi AirPlay: overlay allowed, `deviceidle whitelist`, uid policy 0 (`airplay/install.sh`) | opening the mirror screen by itself; keeping the network while in the background | `pm uninstall com.sall.piairplay` |
 | Pi Home's uid policy set to 0 (`service call netpolicy 1 i32 <uid> i32 0`) | LineageOS installed it with no network access (`REJECT_ALL`) | — |
 | Screensaver set to `com.sall.pihome/.ClockDream` | the clock screensaver | pick another in Android settings |
+
+## The AirPlay receiver
+
+A separate app, `com.sall.piairplay`, in `airplay/`. It announces "Pi" through Android's mDNS and
+runs the AirPlay protocol from [java-airplay](https://github.com/serezhka/java-airplay) (MIT,
+vendored with small Android changes). Video goes to the Pi 4's hardware H.264 decoder
+(`c2.v4l2.avc.decoder`), sound to Android's AAC-ELD decoder. Details:
+[airplay/README.md](../airplay/README.md). Logs: `adb logcat -s PiAirPlay`.
 
 ## Troubleshooting
 
@@ -145,6 +154,7 @@ Apple TV registers a channel but publishes nothing: its background workers fail 
 | No posters, weather or prayer times | Pi Home has no network: check `dumpsys netpolicy` for its uid, and the Wi-Fi |
 | The row shows nothing for an app | The app doesn't publish to the Android TV provider |
 | The Pi doesn't boot after a change | A privileged permission is missing from the whitelist |
+| "Pi" missing from the Mac's AirPlay list | Open the AirPlay tile once, which starts the receiver; check `adb logcat -s PiAirPlay` for "announced Pi" |
 | Hot (above 80 °C) | Add a fan or heatsinks; lower video quality; ⚙ → Infos Pi shows the temperature |
 
 Useful commands, as root:
