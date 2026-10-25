@@ -1,0 +1,29 @@
+# Netty loads parts of itself reflectively and references optional libraries
+-keep class io.netty.** { *; }
+-dontwarn io.netty.**
+-dontwarn org.slf4j.**
+-dontwarn javax.**
+-dontwarn sun.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.eclipse.jetty.**
+-dontwarn com.aayushatharva.**
+-dontwarn com.github.luben.**
+-dontwarn com.jcraft.**
+-dontwarn com.ning.**
+-dontwarn lzma.**
+-dontwarn net.jpountz.**
+-dontwarn reactor.**
+-dontwarn io.netty.internal.tcnative.**
+-dontwarn org.apache.**
+-dontwarn org.jboss.**
+-dontwarn com.google.protobuf.**
+-dontwarn com.oracle.svm.**
+-dontwarn org.graalvm.**
+-dontwarn lombok.**
+# the AirPlay library and its crypto dependencies
+-keep class com.github.serezhka.** { *; }
+-keep class net.i2p.crypto.** { *; }
+-keep class org.whispersystems.** { *; }
+-keep class com.dd.plist.** { *; }
+-dontwarn org.immutables.**
