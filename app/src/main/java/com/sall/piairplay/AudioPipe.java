@@ -26,6 +26,9 @@ final class AudioPipe {
     private Thread thread;
     private volatile float volume = 1f;
     private volatile AudioTrack track;
+    /** for the log every 10 s: packets received, and sound bytes played */
+    private int packetsIn, bytesOut;
+    private long reportAt;
 
     synchronized void start(AudioStreamInfo info) {
         stop();
@@ -46,7 +49,17 @@ final class AudioPipe {
     }
 
     void onAudio(byte[] packet) {
+        packetsIn++;
         while (!queue.offer(packet)) queue.poll();
+    }
+
+    private void report() {
+        long now = System.currentTimeMillis();
+        if (now < reportAt) return;
+        if (reportAt > 0) Log.i(TAG, "audio: " + packetsIn + " packets in, " + bytesOut / 1024 + " KB played (10 s)");
+        packetsIn = 0;
+        bytesOut = 0;
+        reportAt = now + 10_000;
     }
 
     void setVolume(float v) {
@@ -91,6 +104,7 @@ final class AudioPipe {
             long pts = 0;
             while (!Thread.currentThread().isInterrupted()) {
                 byte[] p = queue.poll(20, TimeUnit.MILLISECONDS);
+                report();
                 if (p != null) {
                     int in = codec.dequeueInputBuffer(20_000);
                     if (in >= 0) {
@@ -104,7 +118,7 @@ final class AudioPipe {
                 for (int out; (out = codec.dequeueOutputBuffer(bi, 0)) >= 0 || out == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED; ) {
                     if (out < 0) continue;
                     ByteBuffer o = codec.getOutputBuffer(out);
-                    if (bi.size > 0) t.write(o, bi.size, AudioTrack.WRITE_BLOCKING);
+                    if (bi.size > 0) bytesOut += Math.max(0, t.write(o, bi.size, AudioTrack.WRITE_BLOCKING));
                     codec.releaseOutputBuffer(out, false);
                 }
             }
