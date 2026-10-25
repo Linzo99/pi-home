@@ -1,0 +1,7 @@
+Vendored from https://github.com/serezhka/java-airplay at 59816100c87212353a4191a922aa97226af2cccd (MIT): protocol/ and server/ sources, unchanged unless noted in README.
+
+Changes for Android (pi-airplay):
+- removed server/.../discovery/MdnsAdvertiser.java and server/.../AirPlayServer.java: JmDNS is
+  replaced by Android's NsdManager in AirPlayService, which also builds the ControlServer itself
+- protocol/.../pairing/PairingIdentity.java: added fromSeed() and seed(), to keep one identity
+  across restarts

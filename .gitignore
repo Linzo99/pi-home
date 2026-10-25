@@ -1,0 +1,5 @@
+build/
+.gradle/
+local.properties
+piairplay.keystore
+.DS_Store
