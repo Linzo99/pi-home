@@ -18,8 +18,8 @@
 
     <application
         android:label="AirPlay"
-        android:icon="@drawable/ic_airplay"
-        android:banner="@drawable/ic_airplay"
+        android:icon="@mipmap/ic_launcher"
+        android:banner="@drawable/banner"
         android:allowBackup="false">
 
         <activity
@@ -49,6 +49,8 @@
         <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- after an update, which stops the receiver -->
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
     </application>
