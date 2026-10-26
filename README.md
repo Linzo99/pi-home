@@ -45,8 +45,8 @@ connected to HDMI 3 of an LG TV. How it works inside, the Pi tweaks and troubles
 
 | | |
 |---|---|
-| **Top left** | Greeting (Bonjour, Bon après-midi, Bonsoir), weather, next prayer |
-| **Top right** | Now playing (when something plays in the background), Wi-Fi, 🌙 Veille, ⟳ Redémarrer, ⚙ Paramètres, clock |
+| **Top left** | Greeting (Bonjour, Bon après-midi, Bonsoir), weather, next prayer, CPU and RAM use |
+| **Top right** | Now playing (when something plays in the background), Wi-Fi (the network's name when highlighted, "Hors ligne" when offline), 🌙 Veille, ⟳ Redémarrer, ⚙ Paramètres, clock |
 | **Title** | Name of the highlighted app, or of the highlighted video |
 | **Dock** | Your first 4 apps |
 | **Row** | Content from the highlighted app |

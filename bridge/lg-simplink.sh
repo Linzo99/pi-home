@@ -82,10 +82,16 @@ handle() { # $1=opcode line  $2=first parameter value
 : > $LOG
 # once a second: Pi Home's Veille/Redémarrer requests (the launcher can't do either without
 # root), the sleep timer, and every 2 minutes a reminder to the TV that the Pi is still here
-(left=0; tick=0
+(left=0; tick=0; synced=0
 while :; do
   sleep 1
   tick=$((tick + 1))
+  # the Pi has no clock battery and boots with an old date, which breaks every HTTPS
+  # certificate check; Android's own time sync can give up before Wi-Fi is up, so retry
+  # every 30 s until it works, then every 6 hours
+  if { [ $synced -eq 0 ] && [ $((tick % 30)) -eq 0 ]; } || [ $((tick % 21600)) -eq 0 ]; then
+    [ "$(cmd network_time_update_service force_refresh 2>/dev/null)" = true ] && synced=1
+  fi
   if [ $((tick % 120)) -eq 0 ]; then
     cec --to 15 --report-physical-addr phys-addr=$PA,prim-devtype=record
     cec --to 15 --device-vendor-id vendor-id=0x00e091

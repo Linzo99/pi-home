@@ -15,8 +15,10 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.Typeface;
+import android.graphics.drawable.ClipDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.media.MediaMetadata;
 import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
@@ -160,6 +162,17 @@ public class MainActivity extends Activity {
     private ConnectivityManager cm;
     private ConnectivityManager.NetworkCallback netCallback;
     private boolean wasOnline;
+    private TextView cpuChip, ramChip;
+    /** the CPU and RAM chips under the greeting, while Home is on screen */
+    private final Runnable statsLoop = new Runnable() {
+        @Override
+        public void run() {
+            float cpu = PiInfo.cpuLoad();
+            if (!Float.isNaN(cpu)) meter(cpuChip, "CPU", cpu);
+            meter(ramChip, "RAM", PiInfo.memoryUsed(MainActivity.this));
+            ui.postDelayed(this, 2000);
+        }
+    };
 
     private final BroadcastReceiver packagesChanged = new BroadcastReceiver() {
         @Override
@@ -226,10 +239,11 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (sessions != null) pickSession(sessions.getActiveSessions(null));
-        if (cm != null && "Wi-Fi".contentEquals(wifiPill.getText())) {
+        if (cm != null && "Wi-Fi".contentEquals(wifiPill.getContentDescription())) {
             NetworkCapabilities caps = cm.getNetworkCapabilities(cm.getActiveNetwork());
-            if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) wifiPill.setText(wifiName(caps));
+            if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) setWifi(wifiName(caps), false);
         }
+        ui.post(statsLoop);
         updateSleepBadge();
         loadWatchNext();
         updateTimeOfDay(false);
@@ -240,6 +254,7 @@ public class MainActivity extends Activity {
         App a = appOf(getCurrentFocus());
         if (a != null) returnTo = a;
         refocus = true;
+        ui.removeCallbacks(statsLoop);
         // the screensaver borrows the last glow colour
         prefs.edit().putInt("glow", glow.getTargetColor()).apply();
         super.onPause();
@@ -421,6 +436,17 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-2, -2);
         pp.topMargin = dp(3);
         hello.addView(prayerLine, pp);
+        LinearLayout stats = new LinearLayout(this);
+        stats.setOrientation(LinearLayout.HORIZONTAL);
+        cpuChip = glassChip();
+        ramChip = glassChip();
+        stats.addView(cpuChip);
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-2, -2);
+        rp.leftMargin = dp(8);
+        stats.addView(ramChip, rp);
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-2, -2);
+        sp.topMargin = dp(8);
+        hello.addView(stats, sp);
         bar.addView(hello, new LinearLayout.LayoutParams(0, -2, 1f));
 
         nowPill = pill(R.drawable.ic_pause, "", false);
@@ -436,7 +462,7 @@ public class MainActivity extends Activity {
         updatePill.setOnClickListener(v -> showUpdatesMenu());
         bar.addView(updatePill, pillParams());
 
-        wifiPill = pill(R.drawable.ic_wifi, "Wi-Fi", false);
+        wifiPill = pill(R.drawable.ic_wifi, "Wi-Fi", true);
         wifiPill.setOnClickListener(v -> openSettings(Settings.ACTION_WIFI_SETTINGS));
         bar.addView(wifiPill, pillParams());
 
@@ -519,7 +545,7 @@ public class MainActivity extends Activity {
             t.setTextColor(fg);
             t.setCompoundDrawableTintList(ColorStateList.valueOf(fg));
             t.setBackground(rounded(has ? Color.WHITE : 0x24FFFFFF, dp(20)));
-            if (compact) pillText(t, has, label);
+            if (compact) pillText(t, has, t.getContentDescription().toString());
             v.animate().scaleX(has ? 1.06f : 1f).scaleY(has ? 1.06f : 1f).setDuration(140).start();
         });
         t.setBackground(rounded(0x24FFFFFF, dp(20)));
@@ -530,6 +556,36 @@ public class MainActivity extends Activity {
             t.setCompoundDrawablePadding(dp(8));
         }
         return t;
+    }
+
+    /** the Wi-Fi button: the network's name while focused, and "Hors ligne" always when offline */
+    private void setWifi(String name, boolean offline) {
+        wifiPill.setContentDescription(name);
+        wifiPill.setTag(offline ? "Hors ligne" : "");
+        pillText(wifiPill, wifiPill.hasFocus(), name);
+    }
+
+    /** a frosted chip whose fill shows a percentage, e.g. "CPU 12 %" */
+    private TextView glassChip() {
+        TextView t = text(11, 0xE6FFFFFF, "sans-serif-medium");
+        GradientDrawable glass = rounded(0x1AFFFFFF, dp(12));
+        glass.setStroke(Math.max(1, dp(1) / 2), 0x33FFFFFF);
+        ClipDrawable fill = new ClipDrawable(rounded(0x33FFFFFF, dp(12)), Gravity.START, ClipDrawable.HORIZONTAL);
+        t.setBackground(new LayerDrawable(new Drawable[] {glass, fill}));
+        t.setPadding(dp(10), dp(4), dp(10), dp(4));
+        t.setMinWidth(dp(84));
+        t.setGravity(Gravity.CENTER);
+        t.setVisibility(View.GONE);
+        return t;
+    }
+
+    private void meter(TextView chip, String name, float pct) {
+        int p = Math.round(Math.max(0, Math.min(100, pct)));
+        chip.setText(name + " " + p + " %");
+        Drawable fill = ((LayerDrawable) chip.getBackground()).getDrawable(1);
+        ((GradientDrawable) ((ClipDrawable) fill).getDrawable()).setColor(p >= 90 ? 0x80FF5252 : p >= 70 ? 0x66FFB74D : 0x33FFFFFF);
+        fill.setLevel(p * 100);
+        chip.setVisibility(View.VISIBLE);
     }
 
     private void pillText(TextView t, boolean focused, String label) {
@@ -1565,7 +1621,7 @@ public class MainActivity extends Activity {
                 else label = "Connecté";
                 boolean online = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
                 runOnUiThread(() -> {
-                    wifiPill.setText(label);
+                    setWifi(label, false);
                     // posters fail to download until the network is up, e.g. right after boot
                     if (online && !wasOnline) {
                         loadWatchNext();
@@ -1579,12 +1635,12 @@ public class MainActivity extends Activity {
             @Override
             public void onLost(Network n) {
                 runOnUiThread(() -> {
-                    wifiPill.setText("Hors ligne");
+                    setWifi("Wi-Fi", true);
                     wasOnline = false;
                 });
             }
         };
-        wifiPill.setText("Hors ligne");
+        setWifi("Wi-Fi", true);
         cm.registerDefaultNetworkCallback(netCallback);
     }
 

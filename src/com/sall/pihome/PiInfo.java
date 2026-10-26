@@ -41,6 +41,33 @@ final class PiInfo {
         return gb(m.availMem) + " libres sur " + gb(m.totalMem);
     }
 
+    /** % of RAM in use */
+    static float memoryUsed(Context c) {
+        ActivityManager.MemoryInfo m = new ActivityManager.MemoryInfo();
+        c.getSystemService(ActivityManager.class).getMemoryInfo(m);
+        return 100f * (m.totalMem - m.availMem) / m.totalMem;
+    }
+
+    private static long lastBusy, lastTotal;
+
+    /** % of CPU time busy since the previous call (all cores), or NaN on the first call */
+    static float cpuLoad() {
+        try (BufferedReader r = new BufferedReader(new FileReader("/proc/stat"))) {
+            String[] f = r.readLine().trim().split("\\s+");
+            long total = 0;
+            for (int i = 1; i < f.length && i <= 8; i++) total += Long.parseLong(f[i]);
+            long idle = Long.parseLong(f[4]) + Long.parseLong(f[5]);
+            long busy = total - idle;
+            float pct = lastTotal == 0 || total == lastTotal ? Float.NaN
+                    : 100f * (busy - lastBusy) / (total - lastTotal);
+            lastBusy = busy;
+            lastTotal = total;
+            return pct;
+        } catch (Exception e) {
+            return Float.NaN;
+        }
+    }
+
     static String storage() {
         StatFs s = new StatFs(Environment.getDataDirectory().getPath());
         return gb(s.getAvailableBytes()) + " libres sur " + gb(s.getTotalBytes());

@@ -151,6 +151,7 @@ vendored with small Android changes). Video goes to the Pi 4's hardware H.264 de
 | The remote does nothing | Switch the TV input away from HDMI 3 and back. As root: `getprop init.svc.lg-simplink` should say `running`; `stop lg-simplink; start lg-simplink` restarts it |
 | The first press after a pause is ignored | Was caused by a stale CEC registration; a clean reboot fixed it |
 | SmartTube's background audio stops | Check the two background exemptions above. Updating Pi Home or SmartTube also stops it |
+| Apps show `SSLHandshakeException` / "Trust anchor" errors after a power cut | The clock is wrong: the Pi has no clock battery. The bridge retries Android's time sync every 30 s until it works; by hand: `adb shell cmd network_time_update_service force_refresh` |
 | No posters, weather or prayer times | Pi Home has no network: check `dumpsys netpolicy` for its uid, and the Wi-Fi |
 | The row shows nothing for an app | The app doesn't publish to the Android TV provider |
 | The Pi doesn't boot after a change | A privileged permission is missing from the whitelist |
