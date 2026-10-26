@@ -80,7 +80,12 @@ Press **Pause** on an app to open its menu.
 - **Renommer**: gives it another name. "Nom d'origine" restores the original.
 - **Infos de l'app**: Android's page for the app (storage, permissions, force stop).
 
-Hidden apps go into an **Apps masquées** tile at the end of the grid. OK on it brings one back.
+Hidden apps go into an **Apps masquées** tile at the end of the grid, behind a 4-digit code: the
+first time, OK on the tile asks you to choose one. After the code, each hidden app can be opened
+or shown again, and the code changed. Type it with the on-screen keypad or the remote's number
+keys; it stays unlocked until you leave the home screen. Forgot it? With root:
+`adb shell "sed -i '/name=\"code\"/d' /data/data/com.sall.pihome/shared_prefs/home.xml"`, then
+restart Pi Home (`adb shell am force-stop com.sall.pihome`).
 
 New apps appear at the end of the grid by themselves.
 

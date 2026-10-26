@@ -162,6 +162,10 @@ public class MainActivity extends Activity {
     private ConnectivityManager cm;
     private ConnectivityManager.NetworkCallback netCallback;
     private boolean wasOnline;
+    /** the hidden apps' code was typed since Home last came to the front */
+    private boolean unlocked;
+    /** the open keypad, which also takes the remote's number keys */
+    private java.util.function.IntConsumer pinDigit;
     private TextView cpuChip, ramChip;
     /** the CPU and RAM chips under the greeting, while Home is on screen */
     private final Runnable statsLoop = new Runnable() {
@@ -254,6 +258,7 @@ public class MainActivity extends Activity {
         App a = appOf(getCurrentFocus());
         if (a != null) returnTo = a;
         refocus = true;
+        unlocked = false;
         ui.removeCallbacks(statsLoop);
         // the screensaver borrows the last glow colour
         prefs.edit().putInt("glow", glow.getTargetColor()).apply();
@@ -769,22 +774,135 @@ public class MainActivity extends Activity {
             if (has) {
                 title.setText("Apps masquées");
                 hideBackdrop();
-                hint.setText("OK pour en afficher une à nouveau");
+                hint.setText(prefs.contains("code") ? "OK puis le code pour les ouvrir" : "OK pour choisir un code qui les protège");
                 glow.setColor(0xFF5A5A6E);
             }
         });
-        t.setOnClickListener(v -> {
-            String[] labels = new String[hiddenApps.size() + 1];
-            Runnable[] actions = new Runnable[labels.length];
-            for (int i = 0; i < hiddenApps.size(); i++) {
-                App a = hiddenApps.get(i);
-                labels[i] = "Afficher « " + a.label + " »";
-                actions[i] = () -> unhide(a);
-            }
-            labels[labels.length - 1] = "Annuler";
-            showMenu("Apps masquées", labels, actions);
-        });
+        t.setOnClickListener(v -> withCode(this::showHiddenMenu));
         return t;
+    }
+
+    private void showHiddenMenu() {
+        String[] labels = new String[hiddenApps.size() + 2];
+        Runnable[] actions = new Runnable[labels.length];
+        for (int i = 0; i < hiddenApps.size(); i++) {
+            App a = hiddenApps.get(i);
+            labels[i] = a.label;
+            actions[i] = () -> showMenu(a.label,
+                    new String[] {"Ouvrir", "Afficher à nouveau", "Retour"},
+                    new Runnable[] {() -> launch(a), () -> unhide(a), this::showHiddenMenu});
+        }
+        labels[labels.length - 2] = "Changer le code";
+        actions[labels.length - 2] = () -> newCode(this::showHiddenMenu);
+        labels[labels.length - 1] = "Fermer";
+        showMenu("Apps masquées", labels, actions);
+    }
+
+    // ---------------------------------------------------------------- code for the hidden apps
+
+    /** runs ok once the code is typed, or once one is chosen the first time; unlocked until Home leaves the screen */
+    private void withCode(Runnable ok) {
+        String saved = prefs.getString("code", null);
+        if (saved == null) newCode(ok);
+        else if (unlocked) ok.run();
+        else showCodePad("Code des apps masquées", c -> {
+            if (codeHash(c).equals(saved)) {
+                unlocked = true;
+                ok.run();
+            } else {
+                Toast.makeText(this, "Code incorrect", Toast.LENGTH_SHORT).show();
+                withCode(ok);
+            }
+        });
+    }
+
+    private void newCode(Runnable then) {
+        showCodePad("Choisissez un code (4 chiffres)", c -> showCodePad("Confirmez le code", again -> {
+            if (!again.equals(c)) {
+                Toast.makeText(this, "Les codes ne correspondent pas", Toast.LENGTH_SHORT).show();
+                newCode(then);
+                return;
+            }
+            prefs.edit().putString("code", codeHash(c)).apply();
+            unlocked = true;
+            Toast.makeText(this, "Code enregistré", Toast.LENGTH_SHORT).show();
+            then.run();
+        }));
+    }
+
+    static String codeHash(String code) {
+        try {
+            byte[] h = java.security.MessageDigest.getInstance("SHA-256").digest(("pihome:" + code).getBytes());
+            StringBuilder b = new StringBuilder();
+            for (byte x : h) b.append(String.format("%02x", x));
+            return b.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** a 4-digit keypad, for the arrows and OK or the remote's number keys */
+    private void showCodePad(String heading, java.util.function.Consumer<String> done) {
+        LinearLayout card = menuCard(heading);
+        StringBuilder code = new StringBuilder();
+        TextView dots = text(28, Color.WHITE, "sans-serif-medium");
+        dots.setGravity(Gravity.CENTER);
+        dots.setLetterSpacing(0.4f);
+        dots.setPadding(0, dp(6), 0, dp(10));
+        Runnable show = () -> {
+            StringBuilder d = new StringBuilder();
+            for (int i = 0; i < 4; i++) d.append(i < code.length() ? '●' : '○');
+            dots.setText(d);
+        };
+        show.run();
+        card.addView(dots, new LinearLayout.LayoutParams(-1, -2));
+        java.util.function.IntConsumer digit = n -> {
+            if (n < 0) {
+                if (code.length() > 0) code.setLength(code.length() - 1);
+            } else if (code.length() < 4) code.append(n);
+            show.run();
+            if (code.length() == 4) {
+                pinDigit = null;
+                String c = code.toString();
+                // let the fourth dot show before the next step
+                ui.postDelayed(() -> {
+                    closeMenu(false);
+                    done.accept(c);
+                }, 150);
+            }
+        };
+        GridLayout pad = new GridLayout(this);
+        pad.setColumnCount(3);
+        View first = null;
+        String[] keys = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "✕"};
+        for (String k : keys) {
+            TextView b = text(20, Color.WHITE, "sans-serif-medium");
+            b.setText(k);
+            b.setGravity(Gravity.CENTER);
+            b.setFocusable(true);
+            b.setClickable(true);
+            b.setBackground(rounded(0x1FFFFFFF, dp(14)));
+            b.setOnFocusChangeListener((v, has) -> {
+                b.setTextColor(has ? Color.BLACK : Color.WHITE);
+                b.setBackground(rounded(has ? Color.WHITE : 0x1FFFFFFF, dp(14)));
+            });
+            b.setOnClickListener(v -> {
+                if (k.equals("✕")) closeMenu(true);
+                else digit.accept(k.equals("⌫") ? -1 : Integer.parseInt(k));
+            });
+            GridLayout.LayoutParams p = new GridLayout.LayoutParams();
+            p.width = dp(96);
+            p.height = dp(52);
+            p.setMargins(dp(5), dp(5), dp(5), dp(5));
+            pad.addView(b, p);
+            if (first == null) first = b;
+        }
+        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-2, -2);
+        pp.gravity = Gravity.CENTER_HORIZONTAL;
+        pp.bottomMargin = dp(6);
+        card.addView(pad, pp);
+        openMenu(card, first);
+        pinDigit = digit;
     }
 
     private TextView tileName(String s, float sp) {
@@ -1485,6 +1603,7 @@ public class MainActivity extends Activity {
 
     /** restoreFocus: put the highlight back where it was before the menu opened */
     private void closeMenu(boolean restoreFocus) {
+        pinDigit = null;
         if (menuLayer.getChildCount() == 0) return;
         menuLayer.removeAllViews();
         menuLayer.setBackgroundColor(Color.TRANSPARENT);
@@ -1552,6 +1671,11 @@ public class MainActivity extends Activity {
         boolean menuKey = key == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || key == KeyEvent.KEYCODE_MEDIA_PAUSE
                 || key == KeyEvent.KEYCODE_MENU;
         if (menuLayer.getChildCount() > 0) {
+            if (pinDigit != null && key >= KeyEvent.KEYCODE_0 && key <= KeyEvent.KEYCODE_9) {
+                swallowUp.add(key);
+                pinDigit.accept(key - KeyEvent.KEYCODE_0);
+                return true;
+            }
             if (key == KeyEvent.KEYCODE_BACK || menuKey) {
                 swallowUp.add(key);
                 closeMenu(true);
