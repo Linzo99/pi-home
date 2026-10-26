@@ -46,7 +46,7 @@ connected to HDMI 3 of an LG TV. How it works inside, the Pi tweaks and troubles
 | | |
 |---|---|
 | **Top left** | Greeting (Bonjour, Bon après-midi, Bonsoir), weather, next prayer, CPU and RAM use |
-| **Top right** | Now playing (when something plays in the background), Wi-Fi (the network's name when highlighted, "Hors ligne" when offline), 🌙 Veille, ⟳ Redémarrer, ⚙ Paramètres, clock |
+| **Top right** | Now playing (when something plays in the background), Wi-Fi (the network's name when highlighted, "Hors ligne" when offline), 🌙 Veille, ⚙ Paramètres, clock |
 | **Title** | Name of the highlighted app, or of the highlighted video |
 | **Dock** | Your first 4 apps |
 | **Row** | Content from the highlighted app |
@@ -92,8 +92,6 @@ New apps appear at the end of the grid by themselves.
 shows the time left, and its menu adds "Annuler la minuterie". Any button on the remote wakes
 the Pi.
 
-**⟳ Redémarrer** restarts the Pi, after a confirmation.
-
 After midnight, if nothing has been touched for an hour, the Pi goes to sleep by itself.
 
 ---
@@ -108,6 +106,7 @@ After midnight, if nothing has been touched for an hour, the Pi goes to sleep by
 - **Rechercher des mises à jour**: checks SmartTube and Nuvio now (see below).
 - **Rappel des prières**: turns the prayer reminder on or off.
 - **Sons de navigation**: Android's click sounds.
+- **Redémarrer le Pi**: restarts the Pi, after a confirmation.
 
 ---
 

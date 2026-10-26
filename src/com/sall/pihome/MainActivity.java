@@ -102,7 +102,7 @@ public class MainActivity extends Activity {
     private LinearLayout dock, watchRow;
     private GridLayout grid;
     private TextView title, hint, gridLabel, watchLabel, wifiPill, greeting, weather, nowPill, sleepPill;
-    private TextView prayerLine, updatePill, restartPill, settingsPill;
+    private TextView prayerLine, updatePill, settingsPill;
     private List<Updates.Update> updates = new ArrayList<>();
     /** packages being updated through the bridge, to report when each one lands */
     private final Set<String> updating = new HashSet<>();
@@ -470,20 +470,11 @@ public class MainActivity extends Activity {
         sleepPill.setOnClickListener(v -> showSleepMenu());
         bar.addView(sleepPill, pillParams());
 
-        TextView restart = restartPill = pill(R.drawable.ic_restart, "Redémarrer", true);
-        restart.setOnClickListener(v -> showMenu("Redémarrer le Pi ?",
-                new String[] {"Redémarrer", "Annuler"},
-                new Runnable[] {() -> {
-                    Toast.makeText(this, "Redémarrage…", Toast.LENGTH_SHORT).show();
-                    request("reboot");
-                }, null}));
-        bar.addView(restart, pillParams());
-
         TextView settings = settingsPill = pill(R.drawable.ic_settings, "Paramètres", true);
         settings.setOnClickListener(v -> showSettingsMenu());
         bar.addView(settings, pillParams());
 
-        for (View v : new View[] {nowPill, updatePill, wifiPill, sleepPill, restart, settings}) v.setId(View.generateViewId());
+        for (View v : new View[] {nowPill, updatePill, wifiPill, sleepPill, settings}) v.setId(View.generateViewId());
         relinkTopBar();
 
         LinearLayout clock = new LinearLayout(this);
@@ -511,7 +502,7 @@ public class MainActivity extends Activity {
      */
     private void relinkTopBar() {
         List<View> row = new ArrayList<>();
-        for (View v : new View[] {nowPill, updatePill, wifiPill, sleepPill, restartPill, settingsPill}) {
+        for (View v : new View[] {nowPill, updatePill, wifiPill, sleepPill, settingsPill}) {
             if (v != null && v.getVisibility() == View.VISIBLE) row.add(v);
         }
         for (int i = 0; i < row.size(); i++) {
@@ -1294,7 +1285,7 @@ public class MainActivity extends Activity {
         showMenu("Paramètres",
                 new String[] {"Paramètres Android", "Infos Pi", "Rechercher des mises à jour",
                         "Rappel des prières : " + (reminder ? "activé" : "désactivé"),
-                        "Sons de navigation : " + (sounds ? "activés" : "désactivés"), "Fermer"},
+                        "Sons de navigation : " + (sounds ? "activés" : "désactivés"), "Redémarrer le Pi", "Fermer"},
                 new Runnable[] {() -> openSettings(Settings.ACTION_SETTINGS), this::showPiInfo, () -> checkUpdates(true), () -> {
                     prefs.edit().putBoolean("prayerReminder", !reminder).apply();
                     Toast.makeText(this, reminder ? "Rappel des prières désactivé" : "Rappel des prières activé", Toast.LENGTH_SHORT).show();
@@ -1305,7 +1296,12 @@ public class MainActivity extends Activity {
                     } catch (Exception e) {
                         Toast.makeText(this, "Impossible de changer les sons", Toast.LENGTH_SHORT).show();
                     }
-                }, null});
+                }, () -> showMenu("Redémarrer le Pi ?",
+                        new String[] {"Redémarrer", "Annuler"},
+                        new Runnable[] {() -> {
+                            Toast.makeText(this, "Redémarrage…", Toast.LENGTH_SHORT).show();
+                            request("reboot");
+                        }, null}), null});
     }
 
     private void showPiInfo() {
