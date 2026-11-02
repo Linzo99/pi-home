@@ -207,11 +207,18 @@ final class SettingsPage {
         setup = null;
     }
 
+    /** the Wi-Fi or Ethernet address: with Tailscale on, the active network is the VPN */
     private String ip() {
         ConnectivityManager cm = a.getSystemService(ConnectivityManager.class);
-        LinkProperties lp = cm.getLinkProperties(cm.getActiveNetwork());
-        if (lp == null) return null;
-        for (LinkAddress l : lp.getLinkAddresses()) if (l.getAddress() instanceof Inet4Address) return l.getAddress().getHostAddress();
+        for (android.net.Network n : cm.getAllNetworks()) {
+            android.net.NetworkCapabilities caps = cm.getNetworkCapabilities(n);
+            if (caps == null || caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) continue;
+            if (!caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+                    && !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)) continue;
+            LinkProperties lp = cm.getLinkProperties(n);
+            if (lp == null) continue;
+            for (LinkAddress l : lp.getLinkAddresses()) if (l.getAddress() instanceof Inet4Address) return l.getAddress().getHostAddress();
+        }
         return null;
     }
 }

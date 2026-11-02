@@ -121,6 +121,12 @@ public class MainActivity extends Activity implements Catalog.Listener {
         rail.setGravity(Gravity.CENTER_VERTICAL);
         rail.setPadding(dp(12), dp(16), dp(12), dp(16));
         for (int i = 0; i < NAMES.length; i++) rail.addView(railItem(i), Ui.margins(-1, -2, 0, dp(3), 0, dp(3)));
+        // up and down stay in the menu: the page's fields can be nearer than the next entry
+        for (TextView t : railItems) t.setId(View.generateViewId());
+        for (int i = 0; i < railItems.size(); i++) {
+            railItems.get(i).setNextFocusUpId(railItems.get(Math.max(0, i - 1)).getId());
+            railItems.get(i).setNextFocusDownId(railItems.get(Math.min(railItems.size() - 1, i + 1)).getId());
+        }
         root.addView(rail, new FrameLayout.LayoutParams(dp(64), -1));
         expandRail(false);
 
