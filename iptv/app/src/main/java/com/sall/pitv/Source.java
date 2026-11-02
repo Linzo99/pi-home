@@ -15,6 +15,20 @@ final class Source {
     String m3u = "";
     String epg = "";
     String agent = DEFAULT_AGENT;
+    /** "host:port" of an HTTP proxy in another country, for geo-blocked channels; empty for none */
+    String proxy = "";
+
+    /** the proxy as host and port, or null */
+    java.net.InetSocketAddress proxyAddress() {
+        String p = proxy.trim().replaceFirst("^https?://", "");
+        int i = p.lastIndexOf(':');
+        if (i <= 0) return null;
+        try {
+            return java.net.InetSocketAddress.createUnresolved(p.substring(0, i), Integer.parseInt(p.substring(i + 1).replace("/", "")));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
 
     boolean isSet() {
         return XTREAM.equals(type) ? !server.isEmpty() && !user.isEmpty() : !m3u.isEmpty();
@@ -65,6 +79,7 @@ final class Source {
         s.epg = p.getString("epg", "");
         s.agent = p.getString("agent", DEFAULT_AGENT);
         if (s.agent.isEmpty()) s.agent = DEFAULT_AGENT;
+        s.proxy = p.getString("proxy", "");
         return s;
     }
 
@@ -72,6 +87,6 @@ final class Source {
         c.getSharedPreferences("source", Context.MODE_PRIVATE).edit()
                 .putString("type", type).putString("server", server.trim()).putString("user", user.trim())
                 .putString("pass", pass.trim()).putString("m3u", m3u.trim()).putString("epg", epg.trim())
-                .putString("agent", agent.trim()).apply();
+                .putString("agent", agent.trim()).putString("proxy", proxy.trim()).apply();
     }
 }

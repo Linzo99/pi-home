@@ -77,6 +77,13 @@ public class PlayerActivity extends Activity {
     private boolean live;
     /** the Xtream channel is tried as HLS after the MPEG-TS address fails */
     private boolean useHls;
+    private DefaultMediaSourceFactory direct, proxied;
+    /** this title goes through the proxy */
+    private boolean viaProxy;
+    /** the last failure was the network's (not the decoder's): worth another route */
+    private boolean lastErrorNetwork = true;
+    /** this title has played already on the current route */
+    private boolean playedOnRoute;
     private int retries;
     private long resumeAt;
 
@@ -151,8 +158,12 @@ public class PlayerActivity extends Activity {
         load(index, pos);
     }
 
+    /** the activity went to the background: standby, or Home */
+    private boolean stopped;
+
     @Override
     protected void onStop() {
+        stopped = true;
         saveProgress(true);
         if (player != null) player.pause();
         super.onStop();
@@ -161,11 +172,12 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onStart() {
         super.onStart();
-        if (player != null && item != null) {
+        if (player != null && item != null && stopped) {
             // back from standby: a live stream must start again from now
-            if (live) reconnect(null);
+            if (live) start(0);
             else player.play();
         }
+        stopped = false;
     }
 
     @Override
@@ -190,16 +202,29 @@ public class PlayerActivity extends Activity {
                 .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES
                         | DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS)
                 .setConstantBitrateSeekingEnabled(true);
-        DefaultMediaSourceFactory sources = new DefaultMediaSourceFactory(http, extractors)
-                .setLoadErrorHandlingPolicy(new DefaultLoadErrorHandlingPolicy(6) {
-                    @Override
-                    public long getRetryDelayMsFor(@NonNull LoadErrorInfo info) {
-                        // a refused address won't work by asking again: fail at once, so the
-                        // other format can be tried
-                        if (info.exception instanceof HttpDataSource.InvalidResponseCodeException) return C.TIME_UNSET;
-                        return Math.min(4_000, info.errorCount * 1_000L);
-                    }
-                });
+        DefaultLoadErrorHandlingPolicy retry = new DefaultLoadErrorHandlingPolicy(6) {
+            @Override
+            public long getRetryDelayMsFor(@NonNull LoadErrorInfo info) {
+                // a refused address won't work by asking again: fail at once, so the other
+                // format, or the proxy, can be tried
+                if (info.exception instanceof HttpDataSource.InvalidResponseCodeException) return C.TIME_UNSET;
+                return Math.min(4_000, info.errorCount * 1_000L);
+            }
+        };
+        DefaultMediaSourceFactory sources = new DefaultMediaSourceFactory(http, extractors).setLoadErrorHandlingPolicy(retry);
+        direct = sources;
+        java.net.InetSocketAddress pa = cat.source.proxyAddress();
+        if (pa != null) {
+            // geo-blocked channels go through a proxy in another country; the rest stays direct
+            okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
+                    .proxy(new java.net.Proxy(java.net.Proxy.Type.HTTP, pa))
+                    .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+                    .followSslRedirects(true)
+                    .build();
+            proxied = new DefaultMediaSourceFactory(new androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(client).setUserAgent(Net.agent), extractors)
+                    .setLoadErrorHandlingPolicy(retry);
+        }
         DefaultRenderersFactory renderers = new DefaultRenderersFactory(this)
                 // FFmpeg for the AC3 / E-AC3 / DTS sound Android can't play
                 .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
@@ -226,6 +251,11 @@ public class PlayerActivity extends Activity {
         String audioLang = pp.getString("audioLang", null), subLang = pp.getString("subLang", null);
         if (audioLang != null) tp.setPreferredAudioLanguage(audioLang);
         if (subLang != null && !subLang.isEmpty()) tp.setPreferredTextLanguage(subLang).setSelectUndeterminedTextLanguage(false);
+        // a channel's "default" subtitles stay off; only the chosen language (or forced ones) show
+        tp.setIgnoredTextSelectionFlags(C.SELECTION_FLAG_DEFAULT);
+        // the Pi's hardware decoder fails when a stream switches quality on the way (e.g. 540p to
+        // 720p): take the best one at once and keep it
+        tp.setForceHighestSupportedBitrate(true);
         player.setTrackSelectionParameters(tp.build());
         player.addListener(new Player.Listener() {
             @Override
@@ -235,6 +265,8 @@ public class PlayerActivity extends Activity {
                 if (s == Player.STATE_BUFFERING && live) ui.postDelayed(stallCheck, 15_000);
                 if (s == Player.STATE_READY) {
                     message.setVisibility(View.GONE);
+                    getSharedPreferences("player", MODE_PRIVATE).edit().putBoolean("geo." + item.key(), viaProxy).apply();
+                    playedOnRoute = true;
                     if (live && Source.XTREAM.equals(cat.source.type) && item.url.endsWith(".ts")) {
                         getSharedPreferences("player", MODE_PRIVATE).edit().putBoolean("hls." + cat.source.id(), useHls).apply();
                     }
@@ -266,12 +298,18 @@ public class PlayerActivity extends Activity {
                     player.prepare();
                     return;
                 }
-                boolean decoder = e.errorCode >= 4000 && e.errorCode < 5000;
-                if (decoder && retries > 0) {
+                // the Pi's hardware decoder sometimes fails when a stream restarts: that is worth
+                // a few tries; only an unsupported format is final
+                boolean unsupported = e.errorCode == PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED
+                        || e.errorCode == PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES;
+                if (unsupported && retries > 0) {
                     fail("Ce format vidéo n'est pas lu par le Pi (" + e.getErrorCodeName() + ")");
                     return;
                 }
-                reconnect(e.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ? "Le serveur refuse le flux" : "Connexion perdue");
+                boolean network = e.errorCode >= 2000 && e.errorCode < 3000;
+                lastErrorNetwork = network;
+                reconnect(e.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ? "Le serveur refuse le flux"
+                        : network ? "Connexion perdue" : "Erreur de lecture");
             }
 
             @Override
@@ -311,7 +349,12 @@ public class PlayerActivity extends Activity {
         item = items.get(i);
         live = item.kind == Model.LIVE;
         // the format that worked last time for this provider's channels
+        playedOnRoute = false;
+        lastErrorNetwork = true;
         useHls = live && getSharedPreferences("player", MODE_PRIVATE).getBoolean("hls." + cat.source.id(), false);
+        // marked so in the playlist (iptv-org's "[Geo-blocked]"), or found so before
+        viaProxy = proxied != null && (item.name.toLowerCase(Locale.ROOT).contains("geo-blocked")
+                || getSharedPreferences("player", MODE_PRIVATE).getBoolean("geo." + item.key(), false));
         retries = 0;
         resumeAt = pos;
         subtitles.setVisibility(View.GONE);
@@ -333,8 +376,11 @@ public class PlayerActivity extends Activity {
         if (lower.contains(".m3u8")) b.setMimeType(MimeTypes.APPLICATION_M3U8);
         else if (lower.contains(".mpd")) b.setMimeType(MimeTypes.APPLICATION_MPD);
         if (live) b.setLiveConfiguration(new MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(8_000).build());
-        if (pos > 0) player.setMediaItem(b.build(), pos);
-        else player.setMediaItem(b.build());
+        DefaultMediaSourceFactory f = viaProxy && proxied != null ? proxied : direct;
+        android.util.Log.i("PiTV", "start " + (f == proxied ? "proxy " : "direct ") + url);
+        androidx.media3.exoplayer.source.MediaSource src = f.createMediaSource(b.build());
+        if (pos > 0) player.setMediaSource(src, pos);
+        else player.setMediaSource(src);
         player.prepare();
         player.play();
     }
@@ -347,9 +393,15 @@ public class PlayerActivity extends Activity {
             fail((why == null ? "Lecture impossible" : why) + ". Réessayez plus tard ou choisissez une autre chaîne.");
             return;
         }
-        // an Xtream channel that fails in one format often works in the other: switch at once,
-        // and back again on the next failures
-        if (live && Source.XTREAM.equals(cat.source.type) && item.url.endsWith(".ts") && retries <= 4) useHls = !useHls;
+        // a stream that fails directly may be geo-blocked, and one through the proxy may fail
+        // because the proxy is out of reach: odd retries switch between the two
+        // after three failures in a row, the route that worked may be the problem now
+        if (retries >= 3) playedOnRoute = false;
+        if (!lastErrorNetwork || playedOnRoute) {
+            // a decoder hiccup, or a drop after it played: same route again
+        } else if (proxied != null && retries % 2 == 1) viaProxy = !viaProxy;
+        // an Xtream channel that fails in one format often works in the other
+        else if (live && Source.XTREAM.equals(cat.source.type) && item.url.endsWith(".ts") && retries <= 6) useHls = !useHls;
         long pos = live ? 0 : Math.max(0, player.getCurrentPosition());
         if (why != null) {
             message.setText(why + " — reconnexion" + (retries > 1 ? " (" + retries + ")" : "") + "…");
@@ -526,7 +578,8 @@ public class PlayerActivity extends Activity {
         if (live) {
             Model.Prog p = cat.epg.now(item);
             List<Model.Prog> up = cat.epg.upcoming(item);
-            subtitle.setText(p == null ? "En direct" : p.title + "   " + Ui.clock(p.start) + " – " + Ui.clock(p.stop));
+            subtitle.setText((p == null ? "En direct" : p.title + "   " + Ui.clock(p.start) + " – " + Ui.clock(p.stop))
+                    + (viaProxy ? "   ·   via le proxy" : ""));
             if (p != null) {
                 seek.setProgress((int) (1000 * (now - p.start) / Math.max(1, p.stop - p.start)));
                 seek.setSecondaryProgress(0);

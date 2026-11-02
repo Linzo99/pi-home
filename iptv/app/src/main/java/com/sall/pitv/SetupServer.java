@@ -95,6 +95,7 @@ final class SetupServer {
             s.epg = f.getOrDefault("epg", "");
             s.agent = f.getOrDefault("agent", Source.DEFAULT_AGENT);
             if (s.agent.trim().isEmpty()) s.agent = Source.DEFAULT_AGENT;
+            s.proxy = f.getOrDefault("proxy", "");
             ui.post(() -> saved.onSaved(s));
             html = page("<p class=ok>✓ Enregistré. La liste se charge sur la télé.</p>", s);
         } else {
@@ -145,6 +146,7 @@ final class SetupServer {
                 + "</div>"
                 + "<label>Guide des programmes XMLTV <small>(facultatif)</small></label><input name=epg placeholder='http://…/xmltv.php?…' value='" + esc(s.epg) + "' autocapitalize=off autocorrect=off>"
                 + "<label>User-Agent <small>(à changer seulement si le fournisseur l'exige)</small></label><input name=agent value='" + esc(s.agent) + "' autocapitalize=off autocorrect=off>"
+                + "<label>Proxy pour les chaînes géo-bloquées <small>(facultatif, hôte:port)</small></label><input name=proxy placeholder='100.113.181.10:8888' value='" + esc(s.proxy) + "' autocapitalize=off autocorrect=off>"
                 + "<button>Enregistrer</button></form>"
                 + "<script>function sw(){var m=document.getElementById('type').value=='m3u';"
                 + "document.querySelector('.m3u').className='m3u'+(m?' show':'');document.querySelector('.xt').className='xt'+(m?'':' show');}</script>"

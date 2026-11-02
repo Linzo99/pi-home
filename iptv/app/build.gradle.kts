@@ -55,6 +55,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:$media3")
     implementation("androidx.media3:media3-exoplayer-hls:$media3")
     implementation("androidx.media3:media3-exoplayer-dash:$media3")
+    // geo-blocked channels through a proxy (HttpURLConnection has no per-request proxy)
+    implementation("androidx.media3:media3-datasource-okhttp:$media3")
     // AC3 / E-AC3 / DTS / MP2 audio, which Android doesn't decode and IPTV films often use
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:$media3+1")
     implementation("androidx.recyclerview:recyclerview:1.3.2")

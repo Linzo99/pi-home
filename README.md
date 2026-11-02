@@ -165,6 +165,8 @@ same Wi-Fi: open the address shown on the TV (`http://192.168.1.116:8765`) and f
   Épisode suivant and Format. The chosen audio and subtitle languages are kept for the next film.
 - Films and episodes resume where you stopped (Continuer à regarder on Accueil).
 
+Geo-blocked German and EU channels play through a proxy on the Hetzner server, over Tailscale.
+
 Details and how it stays reliable: [iptv/README.md](iptv/README.md).
 
 ---

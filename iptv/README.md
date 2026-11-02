@@ -46,9 +46,34 @@ The phone form runs only while Paramètres is on screen, on port 8765.
 | A stream drops | The player reconnects by itself, up to 8 times with a growing pause, and says so on screen |
 | A channel refused | A refused address (HTTP 4xx) isn't retried in place. An Xtream channel switches between MPEG-TS (`.ts`) and HLS (`.m3u8`), and the format that worked is remembered for the next channels |
 | A live stream stalls | Restarted after 15 s of buffering; "behind live window" jumps back to live |
+| Quality switches | The Pi's decoder fails when a stream changes quality mid-way, so the best quality is taken at once and kept |
 | Sound | Hardware decoding first, FFmpeg (Jellyfin's Media3 build) for AC3, E-AC3, DTS and MP2 |
 | Memory | The buffer is capped at 64 MB; posters are decoded at the size they're shown, with a 300 MB disk cache |
 | Providers that check the app | The User-Agent is VLC's by default, and can be changed |
+
+## Geo-blocked channels
+
+Some channels only play from one country. Pi TV can send those through an HTTP proxy in that
+country (Paramètres → Proxy, `host:port`), and only those: everything else stays direct.
+
+- Channels marked `[Geo-blocked]` in their name (iptv-org's playlists do) go through the proxy.
+- Any channel that fails directly is tried through the proxy, and back direct if the proxy is out
+  of reach. A channel that only plays through the proxy is remembered.
+- The channel's info line says « via le proxy ».
+
+The proxy here is tinyproxy on the Hetzner server (Germany, so German and EU channels), on port
+8888, reachable only over Tailscale: the Pi runs the Tailscale app, and the server's firewall
+lets 8888 in on `tailscale0` only. Setting it up on another Ubuntu server:
+
+```sh
+apt-get install tinyproxy
+# /etc/tinyproxy/tinyproxy.conf: Port 8888, Allow 127.0.0.1, Allow 100.64.0.0/10,
+# DisableViaHeader Yes, and no ConnectPort lines (streams use many ports)
+systemctl restart tinyproxy
+```
+
+Then `100.x.y.z:8888` (the server's Tailscale address) in Pi TV. A channel uses about 1–2 GB an
+hour through it. US, UK or French channels need a proxy in those countries.
 
 ## Build and install
 

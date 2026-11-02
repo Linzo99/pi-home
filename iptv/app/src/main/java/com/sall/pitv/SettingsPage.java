@@ -23,7 +23,7 @@ final class SettingsPage {
     final View view;
     private final MainActivity a;
     private final TextView typeX, typeM, phone, state;
-    private final EditText server, user, pass, m3u, epg, agent;
+    private final EditText server, user, pass, m3u, epg, agent, proxy;
     private final LinearLayout xtFields, m3uFields;
     private String type;
     private SetupServer setup;
@@ -71,6 +71,7 @@ final class SettingsPage {
         form.addView(m3uFields);
         epg = field(form, "Guide XMLTV (facultatif)", "http://…/xmltv.php?…", s.epg, false);
         agent = field(form, "User-Agent", Source.DEFAULT_AGENT, s.agent, false);
+        proxy = field(form, "Proxy pour les chaînes géo-bloquées (facultatif, hôte:port)", "100.113.181.10:8888", s.proxy, false);
 
         LinearLayout actions = new LinearLayout(a);
         actions.addView(Ui.button(a, 0, "Enregistrer et charger", v -> save(read())));
@@ -142,6 +143,7 @@ final class SettingsPage {
         s.epg = epg.getText().toString();
         s.agent = agent.getText().toString();
         if (s.agent.trim().isEmpty()) s.agent = Source.DEFAULT_AGENT;
+        s.proxy = proxy.getText().toString();
         return s;
     }
 
@@ -168,6 +170,7 @@ final class SettingsPage {
         m3u.setText(s.m3u);
         epg.setText(s.epg);
         agent.setText(s.agent);
+        proxy.setText(s.proxy);
         setType(type);
         save(s);
     }
