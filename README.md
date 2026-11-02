@@ -149,6 +149,26 @@ smoother. How it works: [airplay/README.md](airplay/README.md).
 
 ---
 
+## Pi TV (IPTV)
+
+**Pi TV** plays an IPTV subscription with a Netflix-style interface: Accueil, TV en direct, Films,
+Séries, Ma liste, Recherche. It takes an **Xtream Codes** login (server, user, password) or an
+**M3U playlist** link, with an optional XMLTV programme guide.
+
+The first time, Pi TV opens on Paramètres. The easiest way to fill it in is from a phone on the
+same Wi-Fi: open the address shown on the TV (`http://192.168.1.116:8765`) and fill in the form.
+
+- **OK** opens a film or series, or plays a channel. **Pause** on a poster or channel adds it to
+  Ma liste (favourite channels).
+- In a channel, **up / down** switch channels in the same category; **OK** opens the channel list.
+- In a film, **left / right** move back and forward; **OK** shows Pause, Audio, Sous-titres,
+  Épisode suivant and Format. The chosen audio and subtitle languages are kept for the next film.
+- Films and episodes resume where you stopped (Continuer à regarder on Accueil).
+
+Details and how it stays reliable: [iptv/README.md](iptv/README.md).
+
+---
+
 ## App updates
 
 SmartTube and Nuvio don't come from the Play Store, so nothing updates them. Pi Home checks
@@ -197,13 +217,14 @@ installed by Android Studio on macOS. There is no Gradle.
 ./build.sh install    # builds and installs over the Pi's copy, keeping your settings
 ./setup.sh            # full install on a fresh Pi: system files, reboot, settings, AirPlay
 airplay/install.sh    # builds and installs only the AirPlay receiver (uses Gradle)
+iptv/install.sh       # builds and installs Pi TV, the IPTV player (uses Gradle)
 ```
 
 `PI_HOST` changes the Pi's address (default `192.168.1.116:5555`).
 
 Updating Pi Home restarts the home screen, which also stops SmartTube's background audio.
 
-Back up **`pihome.keystore`** and **`airplay/piairplay.keystore`**. They sign the two apps, and
+Back up **`pihome.keystore`**, **`airplay/piairplay.keystore`** and **`iptv/pitv.keystore`**. They sign the three apps, and
 updates must use the same keys. They're deliberately left out of Git.
 
 ## Project layout
@@ -217,5 +238,6 @@ updates must use the same keys. They're deliberately left out of Git.
 | `bridge/lg-simplink.rc` | Starts the bridge at boot |
 | `privapp-permissions-pihome.xml` | Allows the launcher's three system permissions |
 | `airplay/` | The AirPlay receiver, a separate app built with Gradle; see its [README](airplay/README.md) |
+| `iptv/` | Pi TV, the IPTV player, a separate app built with Gradle; see its [README](iptv/README.md) |
 | `build.sh`, `setup.sh` | Build, and install on a fresh Pi |
 | `docs/` | This guide's screenshots and [HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) |

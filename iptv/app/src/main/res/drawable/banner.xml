@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pi Home and Android TV tile: a TV on Netflix-like black and red -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path android:pathData="M0,0h320v180h-320z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="320"
+                android:endY="180"
+                android:startColor="#FF141414"
+                android:endColor="#FF5A0207" />
+        </aapt:attr>
+    </path>
+    <group
+        android:translateX="40"
+        android:translateY="54"
+        android:scaleX="3"
+        android:scaleY="3">
+        <path
+            android:fillColor="#FFE50914"
+            android:pathData="M21,6h-7.59l3.29,-3.29L16,2l-4,4 -4,-4 -0.71,0.71L10.59,6H3c-1.1,0 -2,0.89 -2,2v12c0,1.1 0.9,2 2,2h18c1.1,0 2,-0.9 2,-2V8c0,-1.11 -0.9,-2 -2,-2zM9,10v8l7,-4z" />
+    </group>
+    <group
+        android:translateX="128"
+        android:translateY="62">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M0,0h22c12,0 18,6 18,15s-6,15 -18,15h-10v26h-12zM12,10v10h9c4,0 6,-2 6,-5s-2,-5 -6,-5zM48,0h12v56h-12zM80,0h40v10h-14v46h-12v-46h-14zM122,0h13l12,40 12,-40h13l-19,56h-12z" />
+    </group>
+</vector>
