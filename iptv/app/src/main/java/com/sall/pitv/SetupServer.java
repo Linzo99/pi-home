@@ -27,10 +27,12 @@ final class SetupServer {
 
     private final Saved saved;
     private final Source current;
+    private final android.content.Context app;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private ServerSocket server;
 
-    SetupServer(Source current, Saved saved) {
+    SetupServer(android.content.Context c, Source current, Saved saved) {
+        this.app = c.getApplicationContext();
         this.current = current;
         this.saved = saved;
     }
@@ -71,6 +73,10 @@ final class SetupServer {
         while ((line = in.readLine()) != null && !line.isEmpty()) {
             if (line.toLowerCase().startsWith("content-length:")) length = Integer.parseInt(line.substring(15).trim());
         }
+        if (request.startsWith("POST /collections")) {
+            reply(c, "text/plain", importCollections(utf8Body(in, length)));
+            return;
+        }
         String body = "";
         if (length > 0 && length < 64 * 1024) {
             char[] buf = new char[length];
@@ -96,17 +102,52 @@ final class SetupServer {
             s.agent = f.getOrDefault("agent", Source.DEFAULT_AGENT);
             if (s.agent.trim().isEmpty()) s.agent = Source.DEFAULT_AGENT;
             s.proxy = f.getOrDefault("proxy", "");
+            if (f.containsKey("addons")) {
+                // one link per line
+                Addons.get(app).setUrls(java.util.Arrays.asList(f.get("addons").split("\\s+")));
+                Catalog.get(app).loadAddons(true);
+            }
             ui.post(() -> saved.onSaved(s));
-            html = page("<p class=ok>✓ Enregistré. La liste se charge sur la télé.</p>", s);
+            html = page("<p class=ok>✓ Enregistré. La liste se charge sur la télé.</p>", s, addons());
         } else {
-            html = page("", current);
+            html = page("", current, addons());
         }
-        byte[] data = html.getBytes(StandardCharsets.UTF_8);
+        reply(c, "text/html", html);
+    }
+
+    private static void reply(Socket c, String type, String text) throws Exception {
+        byte[] data = text.getBytes(StandardCharsets.UTF_8);
         OutputStream out = c.getOutputStream();
-        out.write(("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " + data.length
+        out.write(("HTTP/1.1 200 OK\r\nContent-Type: " + type + "; charset=utf-8\r\nContent-Length: " + data.length
                 + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
         out.write(data);
         out.flush();
+    }
+
+    /** a body of [bytes] UTF-8 bytes, read as text: emoji and accents take more than one byte */
+    private static String utf8Body(BufferedReader in, int bytes) throws Exception {
+        if (bytes <= 0 || bytes > 4 * 1024 * 1024) return "";
+        StringBuilder b = new StringBuilder();
+        int n = 0;
+        while (n < bytes) {
+            int ch = in.read();
+            if (ch < 0) break;
+            b.append((char) ch);
+            n += ch < 0x80 ? 1 : ch < 0x800 ? 2 : Character.isSurrogate((char) ch) ? 2 : 3;
+        }
+        return b.toString();
+    }
+
+    /** a Nuvio collections export from the phone: kept if it holds shelves the app can show */
+    private String importCollections(String json) {
+        try {
+            int shelves = Folders.parse(json).size();
+            if (shelves == 0) return "Ce fichier ne contient aucune collection lisible.";
+            java.nio.file.Files.write(Folders.file(app).toPath(), json.getBytes(StandardCharsets.UTF_8));
+            return "✓ " + shelves + " collections importées. Elles sont dans Collections et sur l'Accueil.";
+        } catch (Exception e) {
+            return "Fichier illisible : choisissez l'export JSON des collections de Nuvio.";
+        }
     }
 
     private static Map<String, String> form(String body) throws Exception {
@@ -123,13 +164,17 @@ final class SetupServer {
         return s == null ? "" : Html.escapeHtml(s);
     }
 
-    private static String page(String message, Source s) {
+    private String addons() {
+        return String.join("\n", Addons.get(app).urls());
+    }
+
+    private static String page(String message, Source s, String addons) {
         boolean x = !Source.M3U.equals(s.type);
         return "<!doctype html><html lang=fr><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
                 + "<title>Pi TV</title><style>"
                 + "body{font-family:-apple-system,system-ui,sans-serif;background:#141414;color:#fff;margin:0;padding:24px;max-width:520px}"
                 + "h1{color:#E50914;margin:0 0 4px}p{color:#aaa}label{display:block;margin:16px 0 6px;color:#ccc;font-size:14px}"
-                + "input,select{width:100%;box-sizing:border-box;padding:12px;border-radius:8px;border:1px solid #333;background:#222;color:#fff;font-size:16px}"
+                + "input,select,textarea{width:100%;box-sizing:border-box;padding:12px;border-radius:8px;border:1px solid #333;background:#222;color:#fff;font-size:16px}"
                 + "button{margin-top:24px;width:100%;padding:14px;border:0;border-radius:8px;background:#E50914;color:#fff;font-size:17px;font-weight:600}"
                 + ".ok{color:#46D369;font-weight:600}.m3u,.xt{display:none}.show{display:block}small{color:#777}"
                 + "</style></head><body><h1>Pi TV</h1><p>Les informations de votre fournisseur IPTV.</p>" + message
@@ -147,8 +192,14 @@ final class SetupServer {
                 + "<label>Guide des programmes XMLTV <small>(facultatif)</small></label><input name=epg placeholder='http://…/xmltv.php?…' value='" + esc(s.epg) + "' autocapitalize=off autocorrect=off>"
                 + "<label>User-Agent <small>(à changer seulement si le fournisseur l'exige)</small></label><input name=agent value='" + esc(s.agent) + "' autocapitalize=off autocorrect=off>"
                 + "<label>Proxy pour les chaînes géo-bloquées <small>(facultatif, hôte:port)</small></label><input name=proxy placeholder='100.113.181.10:8888' value='" + esc(s.proxy) + "' autocapitalize=off autocorrect=off>"
+                + "<label>Add-ons Stremio <small>(un lien manifest.json par ligne)</small></label><textarea name=addons rows=5 autocapitalize=off autocorrect=off>" + esc(addons) + "</textarea>"
                 + "<button>Enregistrer</button></form>"
-                + "<script>function sw(){var m=document.getElementById('type').value=='m3u';"
+                + "<h2 style='margin-top:40px'>Collections</h2><p>L'export des collections de Nuvio (fichier .json) : il remplace celles de la télé.</p>"
+                + "<input type=file id=coll accept='.json,application/json'><button onclick=imp()>Importer les collections</button><p id=collmsg></p>"
+                + "<script>function imp(){var f=document.getElementById('coll').files[0],m=document.getElementById('collmsg');"
+                + "if(!f){m.textContent='Choisissez d\\'abord le fichier.';return;}m.textContent='Envoi…';"
+                + "f.text().then(t=>fetch('/collections',{method:'POST',body:t})).then(r=>r.text()).then(t=>m.textContent=t).catch(e=>m.textContent='Échec : '+e);}"
+                + "function sw(){var m=document.getElementById('type').value=='m3u';"
                 + "document.querySelector('.m3u').className='m3u'+(m?' show':'');document.querySelector('.xt').className='xt'+(m?'':' show');}</script>"
                 + "</body></html>";
     }

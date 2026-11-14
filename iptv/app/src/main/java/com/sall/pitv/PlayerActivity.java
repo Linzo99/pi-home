@@ -48,6 +48,11 @@ import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Full-screen playback. Reliability first: a stream that drops is reconnected by itself (with
@@ -78,6 +83,8 @@ public class PlayerActivity extends Activity {
     /** the Xtream channel is tried as HLS after the MPEG-TS address fails */
     private boolean useHls;
     private DefaultMediaSourceFactory direct, proxied;
+    private DefaultHttpDataSource.Factory http;
+    private androidx.media3.datasource.okhttp.OkHttpDataSource.Factory okhttp;
     /** this title goes through the proxy */
     private boolean viaProxy;
     /** the last failure was the network's (not the decoder's): worth another route */
@@ -86,6 +93,24 @@ public class PlayerActivity extends Activity {
     private boolean playedOnRoute;
     private int retries;
     private long resumeAt;
+    /** an add-on title's links tried so far, by address: the next one is taken when this fails */
+    private final java.util.Set<String> tried = new java.util.HashSet<>();
+    /** when the stream had to wait for data while playing, lately: too often means too slow */
+    private final java.util.ArrayDeque<Long> stalls = new java.util.ArrayDeque<>();
+    /** the connection's speed has been measured in this run (20 s of playing) */
+    private static boolean measured;
+    /** a seek waits for data too: that wait isn't the connection's fault */
+    private long seekedAt;
+    /** a link that doesn't start in time is given up for the next */
+    private final Runnable startTimeout = () -> nextLink(false, "Le lien ne démarre pas");
+    /** stuck waiting for data for a while: a lighter link plays better on this connection */
+    private final Runnable stallTimeout = () -> nextLink(true, "Connexion trop lente");
+    private DefaultExtractorsFactory extractors;
+    /** a live channel paused: recorded from then on, to resume, rewind or forward in it */
+    private Timeshift shift;
+    /** the player reads the recording (not the live stream); [shiftBase] is where it started */
+    private boolean shiftPlaying;
+    private long shiftBase;
 
     private FrameLayout root, videoBox;
     private SurfaceView surface;
@@ -106,7 +131,10 @@ public class PlayerActivity extends Activity {
     private boolean controlsActive;
     private int pendingZap = -1;
 
-    private final Runnable hideOverlay = () -> showOverlay(false);
+    private final Runnable hideOverlay = () -> {
+        // a paused channel keeps its controls on screen, with the time it's been paused
+        if (!livePaused()) showOverlay(false);
+    };
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
@@ -164,8 +192,11 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onStop() {
         stopped = true;
+        endShift();
         saveProgress(true);
         if (player != null) player.pause();
+        // the launcher's row, when Home is pressed during playback
+        TvHome.sync(this);
         super.onStop();
     }
 
@@ -183,6 +214,7 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onDestroy() {
         ui.removeCallbacksAndMessages(null);
+        endShift();
         if (player != null) player.release();
         player = null;
         super.onDestroy();
@@ -191,13 +223,13 @@ public class PlayerActivity extends Activity {
     // ---------------------------------------------------------------- player
 
     private void createPlayer() {
-        DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory()
+        http = new DefaultHttpDataSource.Factory()
                 .setUserAgent(Net.agent)
                 .setAllowCrossProtocolRedirects(true)
                 .setConnectTimeoutMs(12_000)
                 .setReadTimeoutMs(20_000)
                 .setKeepPostFor302Redirects(true);
-        DefaultExtractorsFactory extractors = new DefaultExtractorsFactory()
+        extractors = new DefaultExtractorsFactory()
                 // IPTV streams often lack proper key frame flags; this starts the picture sooner
                 .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES
                         | DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS)
@@ -222,7 +254,8 @@ public class PlayerActivity extends Activity {
                     .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
                     .followSslRedirects(true)
                     .build();
-            proxied = new DefaultMediaSourceFactory(new androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(client).setUserAgent(Net.agent), extractors)
+            okhttp = new androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(client).setUserAgent(Net.agent);
+            proxied = new DefaultMediaSourceFactory(okhttp, extractors)
                     .setLoadErrorHandlingPolicy(retry);
         }
         DefaultRenderersFactory renderers = new DefaultRenderersFactory(this)
@@ -262,8 +295,23 @@ public class PlayerActivity extends Activity {
             public void onPlaybackStateChanged(int s) {
                 spinner.setVisibility(s == Player.STATE_BUFFERING ? View.VISIBLE : View.GONE);
                 ui.removeCallbacks(stallCheck);
+                ui.removeCallbacks(stallTimeout);
                 if (s == Player.STATE_BUFFERING && live) ui.postDelayed(stallCheck, 15_000);
+                if (s == Player.STATE_BUFFERING && canFallBack() && playedOnRoute && player.getPlayWhenReady()) {
+                    // three waits in a minute and a half, or one of 12 s: the link is too heavy
+                    long now = System.currentTimeMillis();
+                    boolean seek = now - seekedAt < 3_000;
+                    if (!seek) stalls.addLast(now);
+                    while (!stalls.isEmpty() && now - stalls.peekFirst() > 90_000) stalls.removeFirst();
+                    if (stalls.size() >= 3) {
+                        nextLink(true, "Connexion trop lente");
+                        return;
+                    }
+                    ui.postDelayed(stallTimeout, seek ? 25_000 : 12_000);
+                }
                 if (s == Player.STATE_READY) {
+                    ui.removeCallbacks(startTimeout);
+                    if (!live && item.source != null) saveSource(PlayerActivity.this, item);
                     message.setVisibility(View.GONE);
                     getSharedPreferences("player", MODE_PRIVATE).edit().putBoolean("geo." + item.key(), viaProxy).apply();
                     playedOnRoute = true;
@@ -283,7 +331,12 @@ public class PlayerActivity extends Activity {
                 if (playing) {
                     // playing for 20 s in a row: the connection is fine again
                     ui.postDelayed(() -> {
-                        if (player != null && player.isPlaying()) retries = 0;
+                        if (player == null || !player.isPlaying()) return;
+                        retries = 0;
+                        // the speed measured while playing: the next fallback goes by it
+                        measured = true;
+                        getSharedPreferences("player", MODE_PRIVATE).edit().putLong("bandwidth",
+                                androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.getSingletonInstance(PlayerActivity.this).getBitrateEstimate()).apply();
                     }, 20_000);
                 }
                 playButton.setText(playing ? "Pause" : "Lecture");
@@ -293,6 +346,12 @@ public class PlayerActivity extends Activity {
             @Override
             public void onPlayerError(@NonNull PlaybackException e) {
                 android.util.Log.w("PiTV", "playback " + e.getErrorCodeName(), e);
+                if (shiftPlaying) {
+                    String why = shift != null ? shift.error() : null;
+                    toast((why != null ? why : "Le différé ne se lit plus") + " : retour au direct");
+                    goLive();
+                    return;
+                }
                 if (e.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
                     player.seekToDefaultPosition();
                     player.prepare();
@@ -308,8 +367,20 @@ public class PlayerActivity extends Activity {
                 }
                 boolean network = e.errorCode >= 2000 && e.errorCode < 3000;
                 lastErrorNetwork = network;
+                // a link that never played is dead: the next one, at once; one that played gets
+                // a couple of tries first
+                if (canFallBack() && (!playedOnRoute || retries >= 2)) {
+                    nextLink(false, e.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ? "Le serveur refuse ce lien"
+                            : network ? "Ce lien ne répond pas" : "Ce lien ne se lit pas");
+                    return;
+                }
                 reconnect(e.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ? "Le serveur refuse le flux"
                         : network ? "Connexion perdue" : "Erreur de lecture");
+            }
+
+            @Override
+            public void onPositionDiscontinuity(@NonNull Player.PositionInfo from, @NonNull Player.PositionInfo to, int reason) {
+                if (reason == Player.DISCONTINUITY_REASON_SEEK) seekedAt = System.currentTimeMillis();
             }
 
             @Override
@@ -345,6 +416,7 @@ public class PlayerActivity extends Activity {
             player.stop();
             cover.setVisibility(View.VISIBLE);
         }
+        endShift();
         index = i;
         item = items.get(i);
         live = item.kind == Model.LIVE;
@@ -357,25 +429,54 @@ public class PlayerActivity extends Activity {
                 || getSharedPreferences("player", MODE_PRIVATE).getBoolean("geo." + item.key(), false));
         retries = 0;
         resumeAt = pos;
+        tried.clear();
+        stalls.clear();
+        ui.removeCallbacks(startTimeout);
+        ui.removeCallbacks(stallTimeout);
         subtitles.setVisibility(View.GONE);
         message.setVisibility(View.GONE);
         ui.removeCallbacks(markWatched);
         if (live) ui.postDelayed(markWatched, 5_000);
-        start(pos);
+        if (item.fromAddon() && (item.url == null || item.url.isEmpty())) findStream(pos);
+        else start(pos);
         fillOverlay();
         showOverlay(true);
         ui.removeCallbacks(tick);
         ui.post(tick);
     }
 
-    private void start(long pos) {
+    /** the address to play: an Xtream channel in the format that works */
+    private String streamUrl() {
         String url = item.url;
         if (live && useHls && url.endsWith(".ts")) url = url.substring(0, url.length() - 3) + ".m3u8";
+        return url;
+    }
+
+    private void start(long pos) {
+        // an add-on episode still looking for its stream
+        if (item.url == null || item.url.isEmpty()) return;
+        String url = streamUrl();
+        // a plugin's link often needs the Referer / User-Agent its script returned
+        Map<String, String> headers = item.headers == null ? java.util.Collections.emptyMap() : item.headers;
+        if (http != null) http.setDefaultRequestProperties(headers);
+        if (okhttp != null) okhttp.setDefaultRequestProperties(headers);
         MediaItem.Builder b = new MediaItem.Builder().setUri(Uri.parse(url));
         String lower = url.toLowerCase(Locale.ROOT);
         if (lower.contains(".m3u8")) b.setMimeType(MimeTypes.APPLICATION_M3U8);
         else if (lower.contains(".mpd")) b.setMimeType(MimeTypes.APPLICATION_MPD);
         if (live) b.setLiveConfiguration(new MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(8_000).build());
+        if (item.subs != null && !item.subs.isEmpty()) {
+            // the add-ons' subtitles, beside the stream's own
+            List<MediaItem.SubtitleConfiguration> subs = new ArrayList<>();
+            for (String[] sub : item.subs) {
+                String l = sub[0].toLowerCase(Locale.ROOT);
+                subs.add(new MediaItem.SubtitleConfiguration.Builder(Uri.parse(sub[0]))
+                        .setMimeType(l.contains(".vtt") ? MimeTypes.TEXT_VTT : l.contains(".ass") || l.contains(".ssa") ? MimeTypes.TEXT_SSA : MimeTypes.APPLICATION_SUBRIP)
+                        .setLanguage(sub[1])
+                        .build());
+            }
+            b.setSubtitleConfigurations(subs);
+        }
         DefaultMediaSourceFactory f = viaProxy && proxied != null ? proxied : direct;
         android.util.Log.i("PiTV", "start " + (f == proxied ? "proxy " : "direct ") + url);
         androidx.media3.exoplayer.source.MediaSource src = f.createMediaSource(b.build());
@@ -383,11 +484,160 @@ public class PlayerActivity extends Activity {
         else player.setMediaSource(src);
         player.prepare();
         player.play();
+        tried.add(item.url);
+        ui.removeCallbacks(startTimeout);
+        if (canFallBack() && !playedOnRoute) ui.postDelayed(startTimeout, 25_000);
+    }
+
+    /** an add-on film or episode with other links to fall back on */
+    private boolean canFallBack() {
+        return item != null && !live && item.alternatives != null && !shiftPlaying;
+    }
+
+    /** the bitrate a quality needs, roughly, in bit/s (0 unknown, 1 = 360p … 5 = 4K) */
+    private static long needs(int q) {
+        return new long[] {6_000_000, 1_000_000, 2_000_000, 4_000_000, 8_000_000, 25_000_000}[q];
+    }
+
+    private static String qualityName(int q) {
+        return new String[] {"", "360p", "480p", "720p", "1080p", "4K"}[q];
+    }
+
+    /**
+     * the next link for this title, when the one playing fails or is too heavy: the best quality
+     * the connection carries (as the player measured it), else the lightest left. [lower] keeps
+     * to lower qualities than the current one.
+     */
+    private void nextLink(boolean lower, String why) {
+        if (!canFallBack()) return;
+        ui.removeCallbacks(startTimeout);
+        ui.removeCallbacks(stallTimeout);
+        int cur = 0;
+        List<Addons.Stream> left = new ArrayList<>();
+        for (Addons.Stream x : new ArrayList<>(item.alternatives)) {
+            if (x.url == null || x.url.isEmpty()) continue;
+            if (x.url.equals(item.url)) cur = x.quality();
+            else if (!tried.contains(x.url)) left.add(x);
+        }
+        if (lower && cur > 0) {
+            List<Addons.Stream> lighter = new ArrayList<>();
+            for (Addons.Stream x : left) if (x.quality() > 0 && x.quality() < cur) lighter.add(x);
+            // nothing lighter: any other link, the connection may suit it better
+            if (!lighter.isEmpty()) left = lighter;
+        }
+        if (left.isEmpty()) {
+            fail(why + ". Aucun autre lien ne fonctionne : choisissez-en un autre ou réessayez plus tard.");
+            return;
+        }
+        // until something has played a while, the meter only guesses: the last real measure is better
+        long bandwidth = androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.getSingletonInstance(this).getBitrateEstimate();
+        long saved = getSharedPreferences("player", MODE_PRIVATE).getLong("bandwidth", 0);
+        if (!measured && saved > 0) bandwidth = saved;
+        Addons.Stream pick = null;
+        for (Addons.Stream x : left) {
+            // the list is best first: the first that fits is the best that fits
+            if (needs(x.quality()) <= bandwidth * 8 / 10) {
+                pick = x;
+                break;
+            }
+        }
+        if (pick == null) {
+            // none fits the measure: the lightest one
+            for (Addons.Stream x : left) if (pick == null || (x.quality() > 0 && (pick.quality() == 0 || x.quality() < pick.quality()))) pick = x;
+        }
+        long pos = playedOnRoute ? Math.max(0, player.getCurrentPosition()) : resumeAt;
+        item.url = pick.url;
+        item.headers = pick.headers;
+        item.bingeGroup = pick.bingeGroup;
+        item.source = pick.source();
+        android.util.Log.i("PiTV", "fallback (" + why + ", ~" + bandwidth / 1000 + " kbit/s): " + pick.label().replace('\n', ' '));
+        String q = qualityName(pick.quality());
+        message.setText(why + " — essai de " + pick.addon + (q.isEmpty() ? "" : " en " + q) + "…");
+        message.setVisibility(View.VISIBLE);
+        spinner.setVisibility(View.VISIBLE);
+        retries = 0;
+        playedOnRoute = false;
+        stalls.clear();
+        resumeAt = pos;
+        start(pos);
+    }
+
+    /** the source that played a title (a series, for its episodes), to take it again next time */
+    static String lastSource(Context c, Model.Item i) {
+        return c.getSharedPreferences("player", MODE_PRIVATE).getString(sourceKey(i), null);
+    }
+
+    private static void saveSource(Context c, Model.Item i) {
+        c.getSharedPreferences("player", MODE_PRIVATE).edit().putString(sourceKey(i), i.source).apply();
+    }
+
+    private static String sourceKey(Model.Item i) {
+        return "src." + (i.kind == Model.EPISODE && i.seriesId != null ? Model.SERIES + ":" + i.seriesId : i.key());
+    }
+
+    /**
+     * an add-on episode queued after the one chosen: its stream is asked for now, the same kind
+     * (add-on and quality) as before if there is one
+     */
+    private void findStream(long pos) {
+        Model.Item it = item;
+        String binge = index > 0 ? items.get(index - 1).bingeGroup : null;
+        message.setText("Recherche d'une source…");
+        message.setVisibility(View.VISIBLE);
+        spinner.setVisibility(View.VISIBLE);
+        String subLang = getSharedPreferences("player", MODE_PRIVATE).getString("subLang", null);
+        cat.async(() -> {
+            Addons ad = Addons.get(this);
+            it.subs = ad.subtitles(it, subLang);
+            // the same source as the last episode plays the moment it answers, without
+            // waiting for every other script
+            AtomicReference<Addons.Stream> same = new AtomicReference<>();
+            CountDownLatch found = new CountDownLatch(1);
+            Future<List<Addons.Stream>> plugins = Plugins.get(this).future(it, part -> {
+                for (Addons.Stream x : part) if (binge != null && binge.equals(x.bingeGroup) && same.compareAndSet(null, x)) found.countDown();
+            });
+            List<Addons.Stream> streams = new ArrayList<>(ad.streams(it));
+            for (Addons.Stream x : streams) if (binge != null && binge.equals(x.bingeGroup)) return streams;
+            try {
+                long until = System.currentTimeMillis() + 45_000;
+                while (binge != null && !plugins.isDone() && System.currentTimeMillis() < until) {
+                    if (found.await(250, TimeUnit.MILLISECONDS)) break;
+                }
+                if (same.get() != null) {
+                    streams.add(0, same.get());
+                    return streams;
+                }
+                streams.addAll(plugins.get(Math.max(1, until - System.currentTimeMillis()), TimeUnit.MILLISECONDS));
+            } catch (Exception e) {
+                plugins.cancel(true);
+            }
+            return streams;
+        }, streams -> {
+            if (player == null || item != it) return;
+            if (streams == null || streams.isEmpty()) {
+                fail("Aucune source pour cet épisode");
+                return;
+            }
+            Addons.Stream s = streams.get(0);
+            for (Addons.Stream x : streams) if (binge != null && binge.equals(x.bingeGroup)) {
+                s = x;
+                break;
+            }
+            it.url = s.url;
+            it.bingeGroup = s.bingeGroup;
+            it.headers = s.headers;
+            it.source = s.source();
+            it.alternatives = streams;
+            message.setVisibility(View.GONE);
+            start(pos);
+        });
     }
 
     /** tries again after a pause that grows with each failure */
     private void reconnect(String why) {
         if (player == null || item == null) return;
+        // a paused channel whose recording failed goes back to live
+        endShift();
         retries++;
         if (retries > 8) {
             fail((why == null ? "Lecture impossible" : why) + ". Réessayez plus tard ou choisissez une autre chaîne.");
@@ -419,6 +669,85 @@ public class PlayerActivity extends Activity {
         message.setText(why);
         message.setVisibility(View.VISIBLE);
         showOverlay(true);
+    }
+
+    // ---------------------------------------------------------------- live pause
+
+    /** Pause on a channel: it's recorded from now on, and the picture stays on this moment */
+    private void pauseLive() {
+        if (shift != null) {
+            // already behind live: the recording goes on while paused
+            player.pause();
+            return;
+        }
+        try {
+            shift = new Timeshift(this, streamUrl(), viaProxy ? cat.source.proxyAddress() : null);
+        } catch (java.io.IOException e) {
+            toast(e.getMessage());
+            return;
+        }
+        shift.start();
+        shiftPlaying = false;
+        // the recording takes over the connection: providers often allow only one
+        player.stop();
+        ui.removeCallbacks(stallCheck);
+        spinner.setVisibility(View.GONE);
+        fillOverlay();
+    }
+
+    private void resumeLive() {
+        if (shiftPlaying) {
+            player.play();
+            return;
+        }
+        String why = shift.error();
+        if (why != null) {
+            toast(why + " : retour au direct");
+            goLive();
+            return;
+        }
+        playShift(shift.oldestMs());
+    }
+
+    /** plays the recording from [ms] (the start of the stretch that holds it) */
+    private void playShift(long ms) {
+        long[] at = shift.entryAt(ms);
+        Timeshift ts = shift;
+        shiftBase = at[0];
+        shiftPlaying = true;
+        player.setMediaSource(new androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(() -> ts.new Source(at[1]), extractors)
+                .createMediaSource(MediaItem.fromUri("timeshift://" + at[1])));
+        player.prepare();
+        player.play();
+        fillOverlay();
+    }
+
+    private void goLive() {
+        endShift();
+        fillOverlay();
+        start(0);
+        showOverlay(true);
+    }
+
+    private void endShift() {
+        if (shift == null) return;
+        shift.close();
+        shift = null;
+        shiftPlaying = false;
+    }
+
+    /** the channel is paused (recording, or its recording paused) */
+    private boolean livePaused() {
+        return live && shift != null && (!shiftPlaying || player == null || !player.getPlayWhenReady());
+    }
+
+    /** where the picture is, in the recording's time */
+    private long shiftPos() {
+        return shiftPlaying ? shiftBase + Math.max(0, player.getCurrentPosition()) : 0;
+    }
+
+    private void toast(String s) {
+        android.widget.Toast.makeText(this, s, android.widget.Toast.LENGTH_LONG).show();
     }
 
     private void ended() {
@@ -530,6 +859,9 @@ public class PlayerActivity extends Activity {
         buttons = new LinearLayout(this);
         playButton = Ui.button(this, R.drawable.ic_pause, "Pause", v -> togglePlay());
         buttons.addView(playButton);
+        TextView toLive = Ui.button(this, 0, "Direct", v -> goLive());
+        toLive.setTag("live");
+        buttons.addView(toLive, Ui.margins(-2, -2, dp(10), 0, 0, 0));
         TextView audio = Ui.button(this, R.drawable.ic_audio, "Audio", v -> pickTrack(C.TRACK_TYPE_AUDIO));
         audio.setTag("audio");
         buttons.addView(audio, Ui.margins(-2, -2, dp(10), 0, 0, 0));
@@ -567,14 +899,27 @@ public class PlayerActivity extends Activity {
         title.setText(live ? (item.num > 0 ? item.num + "  " : "") + item.name : ep && item.seriesName != null ? item.seriesName : item.name);
         buttons.findViewWithTag("next").setVisibility(ep && index + 1 < items.size() ? View.VISIBLE : View.GONE);
         buttons.findViewWithTag("list").setVisibility(live && items.size() > 1 ? View.VISIBLE : View.GONE);
-        playButton.setVisibility(live ? View.GONE : View.VISIBLE);
-        seekRow.setFocusable(!live);
+        buttons.findViewWithTag("live").setVisibility(live && shift != null ? View.VISIBLE : View.GONE);
+        seekRow.setFocusable(!live || shift != null);
         updateTimes();
     }
 
     private void updateTimes() {
         if (player == null || item == null) return;
         long now = System.currentTimeMillis();
+        if (live && shift != null) {
+            // paused or behind live: the bar spans what's recorded, up to live
+            long end = shift.liveMs(), oldest = shift.oldestMs();
+            long pos = seekTarget >= 0 ? seekTarget : shiftPos();
+            seek.setProgress((int) (1000 * Math.max(0, pos - oldest) / Math.max(1, end - oldest)));
+            seek.setSecondaryProgress(1000);
+            times.setText("−" + hms(end - pos));
+            Model.Prog p = cat.epg.now(item);
+            subtitle.setText((p == null ? "" : p.title + "   ·   ") + (livePaused() ? "En pause" : "En différé")
+                    + (viaProxy ? "   ·   via le proxy" : ""));
+            nextLine.setVisibility(View.GONE);
+            return;
+        }
         if (live) {
             Model.Prog p = cat.epg.now(item);
             List<Model.Prog> up = cat.epg.upcoming(item);
@@ -666,6 +1011,12 @@ public class PlayerActivity extends Activity {
     }
 
     private void togglePlay() {
+        if (live) {
+            if (livePaused()) resumeLive();
+            else pauseLive();
+            showOverlay(true);
+            return;
+        }
         if (player.isPlaying()) player.pause();
         else {
             if (player.getPlaybackState() == Player.STATE_IDLE || player.getPlaybackState() == Player.STATE_ENDED) start(player.getCurrentPosition());
@@ -819,7 +1170,17 @@ public class PlayerActivity extends Activity {
     // ---------------------------------------------------------------- seeking
 
     private void seekBy(long delta) {
-        if (player == null || live) return;
+        if (player == null || live && shift == null) return;
+        if (live) {
+            // within the recording; past its end is live again
+            if (seekTarget < 0) seekTarget = shiftPos();
+            seekTarget = Math.max(shift.oldestMs(), Math.min(shift.liveMs(), seekTarget + delta));
+            updateTimes();
+            showOverlay(true);
+            ui.removeCallbacks(commitSeek);
+            ui.postDelayed(commitSeek, 650);
+            return;
+        }
         long dur = player.getDuration();
         if (seekTarget < 0) seekTarget = player.getCurrentPosition();
         seekTarget = Math.max(0, seekTarget + delta);
@@ -831,8 +1192,14 @@ public class PlayerActivity extends Activity {
     }
 
     private void commitSeek() {
-        if (seekTarget >= 0 && player != null) player.seekTo(seekTarget);
+        long to = seekTarget;
         seekTarget = -1;
+        if (to < 0 || player == null) return;
+        if (!live) player.seekTo(to);
+        else if (shift != null) {
+            if (to >= shift.liveMs() - 3_000) goLive();
+            else playShift(to);
+        }
     }
 
     // ---------------------------------------------------------------- keys
@@ -865,7 +1232,9 @@ public class PlayerActivity extends Activity {
             case KeyEvent.KEYCODE_MEDIA_PAUSE:
             case KeyEvent.KEYCODE_MEDIA_PLAY:
                 if (live) {
-                    showOverlay(true);
+                    boolean paused = livePaused();
+                    if (key == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || paused == (key == KeyEvent.KEYCODE_MEDIA_PLAY)) togglePlay();
+                    else showOverlay(true);
                     return true;
                 }
                 if (key == KeyEvent.KEYCODE_MEDIA_PLAY && !player.isPlaying()) player.play();
@@ -888,7 +1257,7 @@ public class PlayerActivity extends Activity {
         }
         if (inButtons) {
             showOverlay(true);
-            if (key == KeyEvent.KEYCODE_DPAD_UP && !live) {
+            if (key == KeyEvent.KEYCODE_DPAD_UP && (!live || shift != null)) {
                 seekRow.requestFocus();
                 return true;
             }
@@ -923,7 +1292,7 @@ public class PlayerActivity extends Activity {
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (live) focusOverlay(true);
+                if (live && shift == null) focusOverlay(true);
                 else {
                     long step = e.getRepeatCount() > 6 ? 60_000 : e.getRepeatCount() > 2 ? 30_000 : 10_000;
                     seekBy(key == KeyEvent.KEYCODE_DPAD_LEFT ? -step : step);
@@ -935,7 +1304,8 @@ public class PlayerActivity extends Activity {
                 return true;
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
-                if (live) {
+                if (livePaused()) togglePlay();
+                else if (live) {
                     if (items.size() > 1) showChannels(true);
                     else focusOverlay(true);
                 } else if (shown) togglePlay();

@@ -18,7 +18,10 @@ import android.widget.TextView;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-/** The look: Netflix black and red, white focus, and lists that keep the highlight in place. */
+/**
+ * The look: black and red, glass panels (translucent, a light edge and a sheen at the top, over
+ * a blurred picture where there is one), white focus, and lists that keep the highlight in place.
+ */
 final class Ui {
     static final int RED = 0xFFE50914, BG = 0xFF141414, CARD = 0xFF2A2A2A, DIM = 0xB3FFFFFF, FAINT = 0x80FFFFFF;
 
@@ -49,6 +52,26 @@ final class Ui {
         return g;
     }
 
+    /**
+     * a glass panel: translucent white, a thin light edge, and a sheen fading down from its top
+     * edge. [level] 0 for a quiet panel, 1 for a selected one.
+     */
+    static Drawable glass(Context c, float radiusPx, int level) {
+        GradientDrawable body = new GradientDrawable();
+        body.setColor(level > 0 ? 0x47FFFFFF : 0x1FFFFFFF);
+        body.setCornerRadius(radiusPx);
+        body.setStroke(Math.max(1, dp(c, 1)), level > 0 ? 0x66FFFFFF : 0x38FFFFFF);
+        GradientDrawable sheen = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[] {level > 0 ? 0x33FFFFFF : 0x1AFFFFFF, 0x00FFFFFF, 0x00FFFFFF});
+        sheen.setCornerRadius(radiusPx);
+        return new android.graphics.drawable.LayerDrawable(new Drawable[] {body, sheen});
+    }
+
+    /** blurs what a view draws (the picture behind a glass panel) */
+    static void blur(View v, float radiusPx) {
+        v.setRenderEffect(android.graphics.RenderEffect.createBlurEffect(radiusPx, radiusPx, android.graphics.Shader.TileMode.CLAMP));
+    }
+
     static GradientDrawable outline(int stroke, int width, float radiusPx) {
         GradientDrawable g = new GradientDrawable();
         g.setColor(Color.TRANSPARENT);
@@ -77,7 +100,7 @@ final class Ui {
         b.setGravity(Gravity.CENTER_VERTICAL);
         b.setFocusable(true);
         b.setClickable(true);
-        b.setPadding(dp(c, 16), dp(c, 8), dp(c, 18), dp(c, 8));
+        b.setPadding(dp(c, 20), dp(c, 9), dp(c, 20), dp(c, 9));
         if (icon != 0) {
             Drawable d = c.getDrawable(icon).mutate();
             d.setBounds(0, 0, dp(c, 18), dp(c, 18));
@@ -86,7 +109,7 @@ final class Ui {
         }
         Runnable style = () -> {
             boolean has = b.hasFocus();
-            b.setBackground(rounded(has ? Color.WHITE : 0x40FFFFFF, dp(c, 6)));
+            b.setBackground(has ? rounded(Color.WHITE, dp(c, 22)) : glass(c, dp(c, 22), 0));
             b.setTextColor(has ? Color.BLACK : Color.WHITE);
             b.setCompoundDrawableTintList(ColorStateList.valueOf(has ? Color.BLACK : Color.WHITE));
         };
@@ -97,6 +120,55 @@ final class Ui {
         });
         b.setOnClickListener(click);
         return b;
+    }
+
+    /** an on/off switch in a pill button: red track and knob at the right when on */
+    static TextView toggle(Context c, boolean on, String what, View.OnClickListener click) {
+        TextView b = button(c, 0, "", click);
+        b.setPadding(dp(c, 10), dp(c, 8), dp(c, 10), dp(c, 8));
+        b.setCompoundDrawablePadding(0);
+        Drawable d = new SwitchDrawable(on, dp(c, 2));
+        d.setBounds(0, 0, dp(c, 40), dp(c, 22));
+        b.setCompoundDrawablesRelative(d, null, null, null);
+        b.setContentDescription(what + (on ? " : activé" : " : désactivé"));
+        return b;
+    }
+
+    /** draws itself in its own colours: the button's focus tint doesn't reach it */
+    private static final class SwitchDrawable extends Drawable {
+        private final boolean on;
+        private final int inset;
+        private final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+
+        SwitchDrawable(boolean on, int inset) {
+            this.on = on;
+            this.inset = inset;
+        }
+
+        @Override
+        public void draw(android.graphics.Canvas canvas) {
+            Rect r = getBounds();
+            float h = r.height(), radius = h / 2;
+            paint.setColor(on ? RED : 0xFF6B6B6B);
+            canvas.drawRoundRect(r.left, r.top, r.right, r.bottom, radius, radius, paint);
+            float knob = radius - inset;
+            paint.setColor(Color.WHITE);
+            canvas.drawCircle(on ? r.right - radius : r.left + radius, r.top + radius, knob, paint);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+            paint.setAlpha(alpha);
+        }
+
+        @Override
+        public void setColorFilter(android.graphics.ColorFilter filter) {
+        }
+
+        @Override
+        public int getOpacity() {
+            return android.graphics.PixelFormat.TRANSLUCENT;
+        }
     }
 
     static void setIcon(TextView b, int icon) {

@@ -1,6 +1,7 @@
 package com.sall.pitv;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
@@ -27,10 +28,18 @@ import java.util.List;
 
 /** The menu on the left, the pages, the hero at the top and the details of a film or series. */
 public class MainActivity extends Activity implements Catalog.Listener {
-    static final int HOME = 0, LIVE = 1, MOVIES = 2, SERIES = 3, FAVS = 4, SEARCH = 5, SETTINGS = 6;
-    private static final String[] NAMES = {"Accueil", "TV en direct", "Films", "Séries", "Ma liste", "Recherche", "Paramètres"};
-    private static final int[] ICONS = {R.drawable.ic_home, R.drawable.ic_live, R.drawable.ic_movie, R.drawable.ic_series,
-            R.drawable.ic_fav, R.drawable.ic_search, R.drawable.ic_settings};
+    /** a film, episode or channel to open, by key: the launcher's entries (TvHome) */
+    static final String EXTRA_OPEN = "pitv.open";
+    static final int HOME = 0, LIVE = 1, MOVIES = 2, SERIES = 3, ANIME = 4, COLLECTIONS = 5, FAVS = 6, SEARCH = 7, SETTINGS = 8;
+    private static final String[] NAMES = {"Accueil", "TV en direct", "Films", "Séries", "Animes", "Collections", "Ma liste", "Recherche", "Paramètres"};
+    private static final int[] ICONS = {R.drawable.ic_home, R.drawable.ic_live, R.drawable.ic_movie, R.drawable.ic_series, R.drawable.ic_anime,
+            R.drawable.ic_collections, R.drawable.ic_fav, R.drawable.ic_search, R.drawable.ic_settings};
+    /** Paramètres' tabs: the IPTV provider, the Stremio add-ons, or the plugins */
+    private static final int TAB_IPTV = 0, TAB_ADDONS = 1, TAB_PLUGINS = 2;
+    private AddonsPage addonsPage;
+    private int settingsTab = TAB_IPTV;
+    private FrameLayout settingsBody;
+    private final List<TextView> settingsTabs = new ArrayList<>();
 
     final Handler ui = new Handler(Looper.getMainLooper());
     Catalog cat;
@@ -38,6 +47,8 @@ public class MainActivity extends Activity implements Catalog.Listener {
     private FrameLayout root, content;
     private ImageView backdrop;
     private View backdropShade;
+    /** the menu's pages: Films, Séries and Animes are tabs of Collections */
+    private static final int[] NAV = {HOME, LIVE, COLLECTIONS, FAVS, SEARCH, SETTINGS};
     private LinearLayout rail;
     private final List<TextView> railItems = new ArrayList<>();
     private TextView statusLine;
@@ -50,11 +61,15 @@ public class MainActivity extends Activity implements Catalog.Listener {
     private Runnable pageRefresh;
     private LivePage livePage;
     private SettingsPage settingsPage;
+    private PluginsPage pluginsPage;
     private DetailsView details;
     private String backdropUrl;
     private final Runnable heroUpdate = this::applyHero;
     private Object heroItem;
     private TextView heroTitle, heroMeta, heroPlot;
+    /** a collection's folder, open over the Collections page: its view and the tile it came from */
+    private View folderView, folderReturn;
+    private TextView[] pageHero;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -65,7 +80,34 @@ public class MainActivity extends Activity implements Catalog.Listener {
         cat.listen(this);
         cat.load(false);
         Images.get(this).trim();
-        show(cat.source.isSet() ? HOME : SETTINGS, true);
+        // the add-ons' films and series are enough to start with
+        show(cat.source.isSet() || !Addons.get(this).urls().isEmpty() ? HOME : SETTINGS, true);
+        openFromLauncher(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        openFromLauncher(intent);
+    }
+
+    /** an entry chosen on the launcher's row: its film or episode resumes, its channel plays */
+    private void openFromLauncher(Intent intent) {
+        String key = intent == null ? null : intent.getStringExtra(EXTRA_OPEN);
+        if (key == null) return;
+        intent.removeExtra(EXTRA_OPEN);
+        lib = Library.get(this);
+        Library.Progress p = lib.progress(key);
+        if (p != null) {
+            open(p);
+            return;
+        }
+        for (Model.Item ch : lib.recentLive()) {
+            if (ch.key().equals(key)) {
+                playChannel(ch, null);
+                return;
+            }
+        }
     }
 
     @Override
@@ -76,11 +118,16 @@ public class MainActivity extends Activity implements Catalog.Listener {
         if (pageRefresh != null && details == null) pageRefresh.run();
         if (details != null) details.refresh();
         if (settingsPage != null) settingsPage.resume();
+        if (pluginsPage != null) pluginsPage.resume();
+        if (livePage != null) livePage.resumePreview();
+        TvHome.sync(this);
     }
 
     @Override
     protected void onPause() {
         if (settingsPage != null) settingsPage.pause();
+        if (pluginsPage != null) pluginsPage.pause();
+        if (livePage != null) livePage.stopPreview();
         super.onPause();
     }
 
@@ -120,7 +167,7 @@ public class MainActivity extends Activity implements Catalog.Listener {
         rail.setOrientation(LinearLayout.VERTICAL);
         rail.setGravity(Gravity.CENTER_VERTICAL);
         rail.setPadding(dp(12), dp(16), dp(12), dp(16));
-        for (int i = 0; i < NAMES.length; i++) rail.addView(railItem(i), Ui.margins(-1, -2, 0, dp(3), 0, dp(3)));
+        for (int i = 0; i < NAV.length; i++) rail.addView(railItem(i), Ui.margins(-1, -2, 0, dp(3), 0, dp(3)));
         // up and down stay in the menu: the page's fields can be nearer than the next entry
         for (TextView t : railItems) t.setId(View.generateViewId());
         for (int i = 0; i < railItems.size(); i++) {
@@ -141,21 +188,23 @@ public class MainActivity extends Activity implements Catalog.Listener {
     }
 
     private TextView railItem(int i) {
+        int which = NAV[i];
         TextView t = Ui.line(this, 14, Ui.DIM, true);
-        t.setText(NAMES[i]);
+        t.setText(NAMES[which]);
         t.setGravity(Gravity.CENTER_VERTICAL);
         t.setPadding(dp(8), dp(8), dp(8), dp(8));
         t.setFocusable(true);
         t.setClickable(true);
-        Drawable d = getDrawable(ICONS[i]).mutate();
+        Drawable d = getDrawable(ICONS[which]).mutate();
         d.setBounds(0, 0, dp(22), dp(22));
         t.setCompoundDrawablesRelative(d, null, null, null);
         t.setCompoundDrawablePadding(dp(16));
         t.setOnFocusChangeListener((v, has) -> {
             // coming into the menu from a page: start on that page's entry
-            if (has && !railOpen && i != page && page >= 0) {
+            int cur = navIndex(page);
+            if (has && !railOpen && i != cur && cur >= 0) {
                 railOpen = true;
-                railItems.get(page).requestFocus();
+                railItems.get(cur).requestFocus();
                 return;
             }
             styleRail();
@@ -165,12 +214,12 @@ public class MainActivity extends Activity implements Catalog.Listener {
             });
         });
         t.setOnClickListener(v -> {
-            show(i, false);
+            show(which, false);
             focusPage();
         });
         t.setOnKeyListener((v, key, e) -> {
             if (e.getAction() == KeyEvent.ACTION_DOWN && key == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                if (page != i) show(i, false);
+                if (page != which) show(which, false);
                 focusPage();
                 return true;
             }
@@ -180,21 +229,26 @@ public class MainActivity extends Activity implements Catalog.Listener {
         return t;
     }
 
+    private static int navIndex(int which) {
+        for (int i = 0; i < NAV.length; i++) if (NAV[i] == which) return i;
+        return -1;
+    }
+
+    /** the highlighted entry white, the open page's in glass with a red icon, open or not */
     private void styleRail() {
         for (int i = 0; i < railItems.size(); i++) {
             TextView t = railItems.get(i);
-            boolean f = t.hasFocus(), cur = i == page;
-            int c = f ? Color.BLACK : cur ? Color.WHITE : 0x99FFFFFF;
-            t.setTextColor(c);
+            boolean f = t.hasFocus(), cur = NAV[i] == page;
+            t.setTextColor(f ? Color.BLACK : cur ? Color.WHITE : 0x99FFFFFF);
             t.setCompoundDrawableTintList(ColorStateList.valueOf(f ? Color.BLACK : cur ? Ui.RED : 0x99FFFFFF));
-            t.setBackground(f ? Ui.rounded(Color.WHITE, dp(8)) : null);
+            t.setBackground(f ? Ui.rounded(Color.WHITE, dp(12)) : cur ? Ui.glass(this, dp(12), 1) : null);
         }
     }
 
     /** the menu shows its labels over a dark shade while it has the highlight */
     private void expandRail(boolean open) {
         ViewGroup.LayoutParams p = rail.getLayoutParams();
-        int w = dp(open ? 210 : 64);
+        int w = dp(open ? 220 : 64);
         if (p.width != w) {
             p.width = w;
             rail.setLayoutParams(p);
@@ -205,11 +259,20 @@ public class MainActivity extends Activity implements Catalog.Listener {
     }
 
     void focusRail() {
-        railItems.get(Math.max(0, page)).requestFocus();
+        int i = navIndex(page);
+        railItems.get(Math.max(0, i < 0 ? navIndex(HOME) : i)).requestFocus();
     }
 
     private void focusPage() {
-        if (page == LIVE && livePage != null) livePage.focus();
+        if (folderView != null) {
+            Rows r = findRows(folderView);
+            if (r != null && !r.isEmpty()) r.focusFirst();
+            else folderView.requestFocus();
+        } else if (page == COLLECTIONS && collChips != null && collChips.get(collTab).isAttachedToWindow()) {
+            collChips.get(collTab).requestFocus();
+        } else if (page == LIVE && livePage != null) livePage.focus();
+        else if (page == SETTINGS && pluginsPage != null) pluginsPage.focus();
+        else if (page == SETTINGS && addonsPage != null) addonsPage.focus();
         else if (page == SETTINGS && settingsPage != null) settingsPage.focus();
         else if (pageView != null) {
             View f = pageView.findViewWithTag("first");
@@ -240,9 +303,14 @@ public class MainActivity extends Activity implements Catalog.Listener {
         content.removeAllViews();
         heroTitle = null;
         pageRefresh = null;
+        if (livePage != null) livePage.stopPreview();
         livePage = null;
         if (settingsPage != null) settingsPage.pause();
         settingsPage = null;
+        if (pluginsPage != null) pluginsPage.pause();
+        pluginsPage = null;
+        addonsPage = null;
+        folderView = null;
         setBackdrop(null);
         switch (which) {
             case LIVE:
@@ -254,10 +322,7 @@ public class MainActivity extends Activity implements Catalog.Listener {
                 pageView = searchPage();
                 break;
             case SETTINGS:
-                settingsPage = new SettingsPage(this);
-                pageView = settingsPage.view;
-                pageRefresh = settingsPage::refresh;
-                settingsPage.resume();
+                pageView = settingsPage();
                 break;
             default:
                 pageView = browsePage(which);
@@ -265,6 +330,81 @@ public class MainActivity extends Activity implements Catalog.Listener {
         content.addView(pageView, new FrameLayout.LayoutParams(-1, -1));
         styleRail();
         if (focus) ui.post(this::focusPage);
+    }
+
+    // ---------------------------------------------------------------- settings
+
+    /** Paramètres: a bar of tabs over the chosen one's page */
+    private View settingsPage() {
+        LinearLayout v = new LinearLayout(this);
+        v.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout bar = new LinearLayout(this);
+        bar.setPadding(dp(40), dp(22), dp(40), 0);
+        settingsTabs.clear();
+        String[] names = {"IPTV", "Add-ons", "Plugins"};
+        for (int i = 0; i < names.length; i++) {
+            int tab = i;
+            TextView t = Ui.line(this, 15, Color.WHITE, true);
+            t.setText(names[i]);
+            t.setPadding(dp(18), dp(8), dp(18), dp(8));
+            t.setFocusable(true);
+            t.setOnFocusChangeListener((x, has) -> {
+                styleSettingsTabs();
+                // a tab opens as soon as it's highlighted, like the seasons of a series
+                if (has && tab != settingsTab) showSettingsTab(tab);
+            });
+            t.setOnClickListener(x -> focusPage());
+            // down goes into the tab's page, not to the menu on the left; up has nowhere to go
+            t.setOnKeyListener((x, key, e) -> {
+                if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
+                if (key == KeyEvent.KEYCODE_DPAD_UP) return true;
+                if (key != KeyEvent.KEYCODE_DPAD_DOWN) return false;
+                focusPage();
+                return true;
+            });
+            bar.addView(t, Ui.margins(-2, -2, i == 0 ? 0 : dp(8), 0, 0, 0));
+            settingsTabs.add(t);
+        }
+        v.addView(bar);
+        settingsBody = new FrameLayout(this);
+        v.addView(settingsBody, new LinearLayout.LayoutParams(-1, 0, 1f));
+        showSettingsTab(settingsTab);
+        return v;
+    }
+
+    private void showSettingsTab(int tab) {
+        settingsTab = tab;
+        if (settingsPage != null) settingsPage.pause();
+        if (pluginsPage != null) pluginsPage.pause();
+        settingsPage = null;
+        pluginsPage = null;
+        addonsPage = null;
+        pageRefresh = null;
+        settingsBody.removeAllViews();
+        View body;
+        if (tab == TAB_PLUGINS) {
+            pluginsPage = new PluginsPage(this);
+            body = pluginsPage.view;
+        } else if (tab == TAB_ADDONS) {
+            addonsPage = new AddonsPage(this);
+            body = addonsPage.view;
+        } else {
+            settingsPage = new SettingsPage(this);
+            body = settingsPage.view;
+            pageRefresh = settingsPage::refresh;
+            settingsPage.resume();
+        }
+        settingsBody.addView(body, new FrameLayout.LayoutParams(-1, -1));
+        styleSettingsTabs();
+    }
+
+    private void styleSettingsTabs() {
+        for (int i = 0; i < settingsTabs.size(); i++) {
+            TextView t = settingsTabs.get(i);
+            boolean f = t.hasFocus(), on = i == settingsTab;
+            t.setBackground(f ? Ui.rounded(Color.WHITE, dp(20)) : on ? Ui.glass(this, dp(20), 1) : null);
+            t.setTextColor(f ? Color.BLACK : on ? Color.WHITE : Ui.DIM);
+        }
     }
 
     // ---------------------------------------------------------------- hero and backdrop
@@ -297,6 +437,15 @@ public class MainActivity extends Activity implements Catalog.Listener {
 
     private void applyHero() {
         if (heroTitle == null || heroItem == null) return;
+        if (heroItem instanceof Folders.Folder) {
+            Folders.Folder d = (Folders.Folder) heroItem;
+            heroTitle.setText(d.title);
+            heroMeta.setText(d.shelf);
+            heroPlot.setText("");
+            heroPlot.setVisibility(View.GONE);
+            setBackdrop(d.backdrop);
+            return;
+        }
         Model.Item i = heroItem instanceof Library.Progress ? ((Library.Progress) heroItem).item : (Model.Item) heroItem;
         Model.Item full = cat.byKey.get(i.key());
         if (full != null) i = full;
@@ -314,7 +463,7 @@ public class MainActivity extends Activity implements Catalog.Listener {
             heroMeta.setText(i.meta());
             heroPlot.setText(i.plot == null ? "" : i.plot);
             Model.Item it = i;
-            if (i.kind == Model.MOVIE && i.plot == null && Source.XTREAM.equals(cat.source.type)) {
+            if (i.kind == Model.MOVIE && i.plot == null && !i.fromAddon() && Source.XTREAM.equals(cat.source.type)) {
                 i.plot = "";
                 cat.async(() -> {
                     Xtream.details(cat.source, it);
@@ -337,7 +486,8 @@ public class MainActivity extends Activity implements Catalog.Listener {
         }
         backdrop.animate().alpha(0f).setDuration(120).withEndAction(() -> {
             if (!url.equals(backdropUrl)) return;
-            Images.get(this).load(backdrop, url, backdrop.getLayoutParams().width / 2, backdrop.getLayoutParams().height / 2, false);
+            int w = backdrop.getLayoutParams().width / 2, h = backdrop.getLayoutParams().height / 2;
+            Images.get(this).load(backdrop, url, w, h, false);
             backdrop.animate().alpha(1f).setDuration(300).start();
         }).start();
     }
@@ -347,21 +497,40 @@ public class MainActivity extends Activity implements Catalog.Listener {
     private View browsePage(int which) {
         LinearLayout v = new LinearLayout(this);
         v.setOrientation(LinearLayout.VERTICAL);
-        v.addView(hero(), new LinearLayout.LayoutParams(-1, dp(232)));
+        LinearLayout tabs = null;
+        if (which == COLLECTIONS) {
+            tabs = new LinearLayout(this);
+            tabs.setPadding(dp(40), dp(22), dp(40), 0);
+            v.addView(tabs);
+        }
+        v.addView(hero(), new LinearLayout.LayoutParams(-1, dp(which == COLLECTIONS ? 190 : 232)));
         Rows rows = new Rows(this, rowCallbacks());
         v.addView(rows, new LinearLayout.LayoutParams(-1, 0, 1f));
         TextView empty = Ui.text(this, 15, Ui.DIM, false);
         empty.setPadding(dp(48), 0, dp(48), 0);
         v.addView(empty);
+        if (tabs != null) collectionTabs(tabs, rows);
         pageRefresh = () -> {
             List<Rows.Row> r = rowsFor(which);
             rows.setRows(r);
+            // the top of the page shows the first title until one is highlighted
+            if (heroReset || heroItem == null || heroTitle.getText().length() == 0) {
+                heroReset = false;
+                for (Rows.Row x : r) {
+                    if (!x.items.isEmpty()) {
+                        hero(x.items.get(0));
+                        break;
+                    }
+                }
+            }
             empty.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE);
             empty.setText(!cat.loaded ? "Chargement…" : cat.error != null ? cat.error
                     : which == FAVS ? "Appuyez sur Pause sur une affiche ou une chaîne pour l'ajouter à votre liste."
+                    : which == ANIME || which == COLLECTIONS && collTab == 3 ? "Aucun add-on d'animes : ajoutez-en un dans Paramètres."
+                    : which == COLLECTIONS && collTab == 0 ? "Aucune collection : importez un export de collections Nuvio depuis le téléphone (Paramètres)."
                     : "Rien à afficher pour l'instant.");
             if (rows.isEmpty()) {
-                heroTitle.setText(NAMES[which]);
+                heroTitle.setText(which == COLLECTIONS ? COLL_TABS[collTab] : NAMES[which]);
                 heroMeta.setText("");
                 heroPlot.setText("");
             }
@@ -376,10 +545,17 @@ public class MainActivity extends Activity implements Catalog.Listener {
             case HOME: {
                 List<Library.Progress> cw = lib.continueWatching();
                 r.add(new Rows.Row("Continuer à regarder", Rows.WIDE, cw));
+                // the collections, near the top as in Nuvio
+                r.addAll(shelfRows());
                 r.add(new Rows.Row("Chaînes regardées récemment", Rows.CHANNEL, lib.recentLive()));
                 r.add(new Rows.Row("Ma liste", Rows.POSTER, merge(lib.favs(Model.MOVIE), lib.favs(Model.SERIES))));
                 r.add(new Rows.Row("Films ajoutés récemment", Rows.POSTER, Catalog.recent(cat.allMovies, 30)));
                 r.add(new Rows.Row("Séries ajoutées récemment", Rows.POSTER, Catalog.recent(cat.allSeries, 30)));
+                // the first catalogue of each add-on kind
+                Addons ad = Addons.get(this);
+                for (List<Addons.Row> l : List.of(ad.movies, ad.series, ad.anime)) {
+                    if (!l.isEmpty()) r.add(new Rows.Row(l.get(0).name, Rows.POSTER, l.get(0).items));
+                }
                 r.add(new Rows.Row("Chaînes favorites", Rows.CHANNEL, lib.favs(Model.LIVE)));
                 // a taste of each kind, so Home is never empty
                 int n = 0;
@@ -397,17 +573,109 @@ public class MainActivity extends Activity implements Catalog.Listener {
             }
             case MOVIES:
                 r.add(new Rows.Row("Ajoutés récemment", Rows.POSTER, Catalog.recent(cat.allMovies, 40)));
+                for (Addons.Row a : Addons.get(this).movies) r.add(new Rows.Row(a.name, Rows.POSTER, a.items));
                 for (Model.Category c : cat.movies) r.add(new Rows.Row(c.name + "  ·  " + c.items.size(), Rows.POSTER, c.items));
                 break;
             case SERIES:
                 r.add(new Rows.Row("Ajoutées récemment", Rows.POSTER, Catalog.recent(cat.allSeries, 40)));
+                for (Addons.Row a : Addons.get(this).series) r.add(new Rows.Row(a.name, Rows.POSTER, a.items));
                 for (Model.Category c : cat.series) r.add(new Rows.Row(c.name + "  ·  " + c.items.size(), Rows.POSTER, c.items));
+                break;
+            case ANIME:
+                for (Addons.Row a : Addons.get(this).anime) r.add(new Rows.Row(a.name, Rows.POSTER, a.items));
+                break;
+            case COLLECTIONS:
+                if (collTab == 0) r.addAll(shelfRows());
+                else r.addAll(rowsFor(collTab == 1 ? MOVIES : collTab == 2 ? SERIES : ANIME));
                 break;
             case FAVS:
                 r.add(new Rows.Row("Chaînes", Rows.CHANNEL, lib.favs(Model.LIVE)));
                 r.add(new Rows.Row("Films", Rows.POSTER, lib.favs(Model.MOVIE)));
                 r.add(new Rows.Row("Séries", Rows.POSTER, lib.favs(Model.SERIES)));
                 break;
+        }
+        return r;
+    }
+
+    /** Collections' sub-tabs: the shelves, then the add-ons' films, series and anime */
+    private static final String[] COLL_TABS = {"Collections", "Films", "Séries", "Animes"};
+    private int collTab;
+    /** the sub-tabs on screen: coming from the menu lands on the open one */
+    private List<TextView> collChips;
+    /** the hero goes back to the page's first title (a sub-tab was changed) */
+    private boolean heroReset;
+
+    /** glass chips over the Collections page; a chip opens as soon as it's highlighted */
+    private void collectionTabs(LinearLayout box, Rows rows) {
+        List<TextView> chips = new ArrayList<>();
+        collChips = chips;
+        boolean[] inside = {false};
+        for (int i = 0; i < COLL_TABS.length; i++) {
+            int tab = i;
+            TextView t = Ui.line(this, 14, Color.WHITE, true);
+            t.setText(COLL_TABS[i]);
+            t.setPadding(dp(18), dp(7), dp(18), dp(7));
+            t.setFocusable(true);
+            t.setClickable(true);
+            Runnable style = () -> {
+                for (int k = 0; k < chips.size(); k++) {
+                    TextView c = chips.get(k);
+                    boolean f = c.hasFocus(), on = k == collTab;
+                    c.setTextColor(f ? Color.BLACK : on ? Color.WHITE : 0xB3FFFFFF);
+                    c.setBackground(f ? Ui.rounded(Color.WHITE, dp(18)) : on ? Ui.glass(this, dp(18), 1) : null);
+                }
+            };
+            t.setOnFocusChangeListener((x, has) -> {
+                // coming up from the rows: onto the open sub-tab, not the nearest
+                if (has && !inside[0] && tab != collTab) {
+                    inside[0] = true;
+                    chips.get(collTab).requestFocus();
+                    return;
+                }
+                if (has && tab != collTab) {
+                    collTab = tab;
+                    heroReset = true;
+                    if (pageRefresh != null) pageRefresh.run();
+                }
+                style.run();
+                ui.post(() -> inside[0] = box.hasFocus());
+            });
+            t.setOnClickListener(x -> {
+                if (!rows.isEmpty()) rows.focusFirst();
+            });
+            t.setOnKeyListener((x, key, e) -> {
+                if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
+                if (key == KeyEvent.KEYCODE_DPAD_UP) return true;
+                if (key == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    if (!rows.isEmpty()) rows.focusFirst();
+                    return true;
+                }
+                if (key == KeyEvent.KEYCODE_DPAD_LEFT && tab == 0) {
+                    focusRail();
+                    return true;
+                }
+                return key == KeyEvent.KEYCODE_DPAD_RIGHT && tab == COLL_TABS.length - 1;
+            });
+            chips.add(t);
+            box.addView(t, Ui.margins(-2, -2, 0, 0, dp(6), 0));
+        }
+        style(chips);
+    }
+
+    private void style(List<TextView> chips) {
+        for (int k = 0; k < chips.size(); k++) {
+            TextView c = chips.get(k);
+            boolean on = k == collTab;
+            c.setTextColor(on ? Color.WHITE : 0xB3FFFFFF);
+            c.setBackground(on ? Ui.glass(this, dp(18), 1) : null);
+        }
+    }
+
+    /** a row of tiles per collection */
+    private List<Rows.Row> shelfRows() {
+        List<Rows.Row> r = new ArrayList<>();
+        for (Folders.Collection c : Folders.load(this)) {
+            r.add(new Rows.Row(c.title, c.folders.get(0).landscape ? Rows.FOLDER_WIDE : Rows.FOLDER_TALL, c.folders));
         }
         return r;
     }
@@ -427,11 +695,13 @@ public class MainActivity extends Activity implements Catalog.Listener {
 
             @Override
             public void onClick(Object item) {
-                open(item);
+                if (item instanceof Folders.Folder) openFolder((Folders.Folder) item);
+                else open(item);
             }
 
             @Override
             public void onMenu(Object item) {
+                if (item instanceof Folders.Folder) return;
                 Model.Item i = item instanceof Library.Progress ? ((Library.Progress) item).item : (Model.Item) item;
                 if (i.kind == Model.EPISODE) return;
                 boolean fav = lib.toggleFav(i);
@@ -445,6 +715,11 @@ public class MainActivity extends Activity implements Catalog.Listener {
         if (o instanceof Library.Progress) {
             Library.Progress p = (Library.Progress) o;
             Model.Item i = p.item;
+            if (i.fromAddon()) {
+                // the stream address saved may have expired: the page asks the add-ons again
+                openDetails(i.kind == Model.EPISODE ? addonSeries(i) : i);
+                return;
+            }
             if (i.kind == Model.EPISODE) {
                 Model.Item s = cat.byKey.get(Model.SERIES + ":" + i.seriesId);
                 if (s != null) {
@@ -464,6 +739,22 @@ public class MainActivity extends Activity implements Catalog.Listener {
         }
     }
 
+    /** an add-on episode's series, as the catalogues showed it if they did */
+    private Model.Item addonSeries(Model.Item ep) {
+        Model.Item s = Addons.get(this).byKey.get(Model.SERIES + ":" + ep.seriesId);
+        if (s != null) return s;
+        Model.Item f = null;
+        for (Model.Item x : lib.favs(Model.SERIES)) if (x.id.equals(ep.seriesId)) f = x;
+        if (f != null) return f;
+        s = new Model.Item();
+        s.kind = Model.SERIES;
+        s.id = s.sid = ep.seriesId;
+        s.stype = ep.stype;
+        s.name = ep.seriesName != null ? ep.seriesName : ep.name;
+        s.image = ep.image;
+        return s;
+    }
+
     /** plays a channel, zapping through its category (or the given list) */
     void playChannel(Model.Item ch, List<Model.Item> list) {
         if (list == null) {
@@ -480,6 +771,8 @@ public class MainActivity extends Activity implements Catalog.Listener {
         }
         int idx = 0;
         for (int k = 0; k < list.size(); k++) if (list.get(k).key().equals(ch.key())) idx = k;
+        // the preview lets go of the video decoder before full screen takes it
+        if (livePage != null) livePage.stopPreview();
         PlayerActivity.play(this, list, idx, -1);
     }
 
@@ -505,6 +798,71 @@ public class MainActivity extends Activity implements Catalog.Listener {
             if (back != null && back.isAttachedToWindow()) back.requestFocus();
             else focusPage();
         }
+    }
+
+    // ---------------------------------------------------------------- collections
+
+    /** a folder's page: its backdrop and name over a row per catalogue, filled as they arrive */
+    private void openFolder(Folders.Folder d) {
+        folderReturn = getCurrentFocus();
+        pageHero = new TextView[] {heroTitle, heroMeta, heroPlot};
+        LinearLayout v = new LinearLayout(this);
+        v.setOrientation(LinearLayout.VERTICAL);
+        v.setBackgroundColor(Color.TRANSPARENT);
+        v.addView(hero(), new LinearLayout.LayoutParams(-1, dp(232)));
+        heroTitle.setText(d.title);
+        heroMeta.setText(d.shelf);
+        heroPlot.setText("Chargement…");
+        Rows rows = new Rows(this, rowCallbacks());
+        v.addView(rows, new LinearLayout.LayoutParams(-1, 0, 1f));
+        pageView.setVisibility(View.INVISIBLE);
+        content.addView(v, new FrameLayout.LayoutParams(-1, -1));
+        folderView = v;
+        setBackdrop(d.backdrop);
+        Addons ad = Addons.get(this);
+        // in the folder's order, whichever answers first
+        Rows.Row[] slots = new Rows.Row[d.sources.size()];
+        int[] pending = {slots.length};
+        for (int k = 0; k < slots.length; k++) {
+            String[] src = d.sources.get(k);
+            int at = k;
+            cat.async(() -> ad.catalog(src[0], src[1], src[2], src[3]), row -> {
+                if (folderView != v) return;
+                pending[0]--;
+                // Netflix's films and Netflix's series: the same name twice, told apart by kind
+                String kind = "movie".equals(src[1]) ? "Films" : "anime".equals(src[1]) ? "Animes" : "Séries";
+                if (row != null) slots[at] = new Rows.Row(row.name + "  ·  " + kind, Rows.POSTER, row.items);
+                boolean first = rows.isEmpty();
+                List<Rows.Row> shown = new ArrayList<>();
+                for (Rows.Row x : slots) if (x != null) shown.add(x);
+                rows.setRows(shown);
+                boolean answered = false;
+                for (Rows.Row x : slots) answered |= x != null;
+                heroPlot.setText(!rows.isEmpty() ? "" : pending[0] > 0 ? "Chargement…"
+                        : answered ? "Ce dossier est vide : ses catalogues ne renvoient rien pour l'instant (certains demandent un compte Trakt relié à l'add-on)."
+                        : "Rien à afficher : l'add-on « " + src[0] + " » n'est pas dans vos add-ons.");
+                heroPlot.setVisibility(heroPlot.getText().length() == 0 ? View.GONE : View.VISIBLE);
+                // onto the first poster once the rows are laid out (not the empty list around them)
+                if (!rows.isEmpty() && (first || !(getCurrentFocus() != null && inside(getCurrentFocus(), rows)))) {
+                    rows.postDelayed(() -> {
+                        View f = getCurrentFocus();
+                        if (folderView == v && (f == null || f == rows || !inside(f, rows))) rows.focusFirst();
+                    }, 80);
+                }
+            });
+        }
+        v.requestFocus();
+    }
+
+    private void closeFolder() {
+        content.removeView(folderView);
+        folderView = null;
+        heroTitle = pageHero[0];
+        heroMeta = pageHero[1];
+        heroPlot = pageHero[2];
+        pageView.setVisibility(View.VISIBLE);
+        if (folderReturn != null && folderReturn.isAttachedToWindow()) folderReturn.requestFocus();
+        else focusPage();
     }
 
     // ---------------------------------------------------------------- search
@@ -543,7 +901,18 @@ public class MainActivity extends Activity implements Catalog.Listener {
             r.add(new Rows.Row("Séries", Rows.POSTER, cat.search(s, Model.SERIES, 60)));
             rows.setRows(r);
             hint.setText(s.trim().isEmpty() ? "Tapez quelques lettres, puis descendez vers les résultats."
-                    : rows.isEmpty() ? "Aucun résultat pour « " + s.trim() + " »" : "");
+                    : rows.isEmpty() ? "Recherche dans les add-ons…" : "");
+            if (s.trim().length() < 2) return;
+            // the add-ons search on their side: their rows follow when they answer
+            Addons ad = Addons.get(this);
+            cat.async(() -> List.of(ad.search(s.trim(), Model.MOVIE), ad.search(s.trim(), Model.SERIES)), found -> {
+                if (found == null || !q.getText().toString().equals(s)) return;
+                boolean had = rows.hasFocus();
+                r.add(new Rows.Row("Films · add-ons", Rows.POSTER, found.get(0)));
+                r.add(new Rows.Row("Séries et animes · add-ons", Rows.POSTER, found.get(1)));
+                if (!had) rows.setRows(r);
+                hint.setText(rows.isEmpty() ? "Aucun résultat pour « " + s.trim() + " »" : "");
+            });
         };
         q.addTextChangedListener(new TextWatcher() {
             @Override
@@ -594,6 +963,8 @@ public class MainActivity extends Activity implements Catalog.Listener {
             if (hadFocus || getCurrentFocus() == null) ui.post(this::focusPage);
         }
         if (page == SETTINGS && settingsPage != null) settingsPage.refresh();
+        // the add-ons' names and descriptions, once their manifests are read
+        if (page == SETTINGS && addonsPage != null) addonsPage.refresh();
     }
 
     @Override
@@ -605,12 +976,45 @@ public class MainActivity extends Activity implements Catalog.Listener {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
+        if (e.getAction() == KeyEvent.ACTION_DOWN && e.getKeyCode() == KeyEvent.KEYCODE_DPAD_UP && page == SETTINGS && settingsBody != null) {
+            // up stays in the tab's page, and from its top goes to its own tab: not to whichever
+            // tab is nearest, nor to the menu on the left
+            View f = getCurrentFocus();
+            if (f != null && inside(f, settingsBody)) {
+                View next = android.view.FocusFinder.getInstance().findNextFocus((ViewGroup) settingsBody, f, View.FOCUS_UP);
+                (next != null ? next : settingsTabs.get(settingsTab)).requestFocus();
+                return true;
+            }
+        }
+        if (e.getAction() == KeyEvent.ACTION_DOWN && e.getKeyCode() == KeyEvent.KEYCODE_DPAD_RIGHT && page == SETTINGS && settingsBody != null) {
+            // right moves along the line, and at its end stays put: not to a switch further down,
+            // nor to the tabs
+            View f = getCurrentFocus();
+            if (f != null && inside(f, settingsBody) && !(f instanceof EditText)) {
+                View next = android.view.FocusFinder.getInstance().findNextFocus((ViewGroup) settingsBody, f, View.FOCUS_RIGHT);
+                if (next != null && sameLine(f, next)) next.requestFocus();
+                return true;
+            }
+        }
+        if (e.getAction() == KeyEvent.ACTION_DOWN && e.getKeyCode() == KeyEvent.KEYCODE_DPAD_DOWN && page == SETTINGS && settingsBody != null) {
+            // down stays in the tab's page: Android's own search would jump to the menu on the left
+            View f = getCurrentFocus();
+            if (f != null && inside(f, settingsBody)) {
+                View next = android.view.FocusFinder.getInstance().findNextFocus((ViewGroup) settingsBody, f, View.FOCUS_DOWN);
+                if (next != null) next.requestFocus();
+                return true;
+            }
+        }
         if (e.getAction() == KeyEvent.ACTION_DOWN && e.getKeyCode() == KeyEvent.KEYCODE_BACK) {
             if (details != null) {
                 if (!details.back()) closeDetails(true);
                 return true;
             }
             if (livePage != null && livePage.back()) return true;
+            if (folderView != null) {
+                closeFolder();
+                return true;
+            }
             if (!rail.hasFocus()) {
                 focusRail();
                 return true;
@@ -622,6 +1026,19 @@ public class MainActivity extends Activity implements Catalog.Listener {
             }
         }
         return super.dispatchKeyEvent(e);
+    }
+
+    /** whether two views overlap vertically on screen */
+    private static boolean sameLine(View a, View b) {
+        int[] p = new int[2], q = new int[2];
+        a.getLocationOnScreen(p);
+        b.getLocationOnScreen(q);
+        return p[1] < q[1] + b.getHeight() && q[1] < p[1] + a.getHeight();
+    }
+
+    private static boolean inside(View v, View parent) {
+        for (android.view.ViewParent p = v.getParent(); p != null; p = p.getParent()) if (p == parent) return true;
+        return false;
     }
 
     int dp(float v) {

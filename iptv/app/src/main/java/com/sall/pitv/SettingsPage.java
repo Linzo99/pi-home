@@ -172,7 +172,7 @@ final class SettingsPage {
         agent.setText(s.agent);
         proxy.setText(s.proxy);
         setType(type);
-        save(s);
+        if (s.isSet()) save(s);
     }
 
     void refresh() {
@@ -198,7 +198,7 @@ final class SettingsPage {
     }
 
     void resume() {
-        if (setup == null) setup = new SetupServer(a.cat.source, this::savedFromPhone);
+        if (setup == null) setup = new SetupServer(a, a.cat.source, this::savedFromPhone);
         setup.start();
     }
 

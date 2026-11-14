@@ -100,6 +100,10 @@ final class Library {
         return progress.get(i.key());
     }
 
+    Progress progress(String key) {
+        return progress.get(key);
+    }
+
     void setProgress(Model.Item i, long pos, long dur) {
         Progress p = progress.get(i.key());
         if (p == null) p = new Progress(i);

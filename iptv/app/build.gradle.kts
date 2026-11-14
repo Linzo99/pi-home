@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -40,6 +41,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
+    }
+
     splits {
         abi {
             isEnable = true
@@ -60,4 +67,7 @@ dependencies {
     // AC3 / E-AC3 / DTS / MP2 audio, which Android doesn't decode and IPTV films often use
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:$media3+1")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+    // Nuvio's JavaScript scrapers: a small engine, run with its own little shims
+    implementation("io.github.dokar3:quickjs-kt-android:1.0.5")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 }

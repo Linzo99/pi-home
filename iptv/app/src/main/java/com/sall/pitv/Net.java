@@ -43,6 +43,7 @@ final class Net {
 
     /** gzip by its magic bytes too: XMLTV guides are often served as .gz without the header */
     static InputStream gunzip(InputStream in) throws IOException {
+        if (!in.markSupported()) in = new BufferedInputStream(in, 64 * 1024);
         in.mark(2);
         int a = in.read(), b = in.read();
         in.reset();

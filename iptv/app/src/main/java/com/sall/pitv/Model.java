@@ -43,6 +43,22 @@ final class Model {
         List<Item> episodes;
         /** the name lower-cased and without accents, for search */
         String folded;
+        /** from a Stremio add-on: its type ("movie", "series") and id ("tt0111161", "kitsu:1:2") */
+        String stype, sid;
+        /** add-on titles: the kind of stream chosen, to take the same for the next episode */
+        String bingeGroup;
+        /** add-on subtitles for the stream: {url, language} */
+        List<String[]> subs;
+        /** the HTTP headers a plugin's stream needs (Referer, User-Agent, …) */
+        java.util.Map<String, String> headers;
+        /** the stream playing: which source it came from (Addons.Stream.source) */
+        String source;
+        /** the other links found for this title, best first: tried in turn when one fails */
+        List<Addons.Stream> alternatives;
+
+        boolean fromAddon() {
+            return sid != null;
+        }
 
         String key() {
             return kind + ":" + id;
@@ -69,7 +85,7 @@ final class Model {
                 o.put("k", kind).put("id", id).put("n", name).putOpt("img", image).putOpt("bd", backdrop)
                         .putOpt("c", category).putOpt("u", url).putOpt("epg", epgId).put("num", num)
                         .putOpt("y", year).putOpt("sid", seriesId).putOpt("sn", seriesName)
-                        .put("s", season).put("e", episode);
+                        .put("s", season).put("e", episode).putOpt("st", stype).putOpt("aid", sid);
             } catch (Exception ignored) {
             }
             return o;
@@ -91,6 +107,8 @@ final class Model {
             i.seriesName = o.optString("sn", null);
             i.season = o.optInt("s");
             i.episode = o.optInt("e");
+            i.stype = o.optString("st", null);
+            i.sid = o.optString("aid", null);
             return i;
         }
     }

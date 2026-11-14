@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /** A film's or series' page: backdrop, story, Play / Resume, My list, and the episodes. */
 final class DetailsView {
@@ -123,6 +125,26 @@ final class DetailsView {
         fill();
         buildButtons();
         load();
+        // the links are looked for while the page is read: they're often there when Play is pressed
+        view.postDelayed(this::lookAhead, 2_000);
+    }
+
+    /** starts the plugins' search for what Play would play, if the page is still open */
+    private void lookAhead() {
+        if (!view.isAttachedToWindow() || !item.fromAddon()) return;
+        Model.Item target = item.kind == Model.MOVIE ? item : nextToPlay();
+        if (target == null) {
+            // a series whose episodes are still loading
+            view.postDelayed(this::lookAhead, 1_000);
+            return;
+        }
+        Plugins plugins = Plugins.get(a);
+        for (Plugins.Scraper sc : plugins.scrapers()) {
+            if (sc.enabled) {
+                plugins.future(target);
+                return;
+            }
+        }
     }
 
     private String shownBackdrop;
@@ -173,6 +195,23 @@ final class DetailsView {
 
     private void load() {
         Source s = a.cat.source;
+        if (item.fromAddon()) {
+            if (item.kind == Model.SERIES) meta.setText("Chargement des épisodes…");
+            a.cat.async(() -> Addons.get(a).details(item), m -> {
+                if (!view.isAttachedToWindow()) return;
+                fill();
+                if (item.kind != Model.SERIES) return;
+                if (m == null || m.isEmpty()) {
+                    // an anime film, or a series the add-ons don't list episodes for: one title
+                    item.kind = Model.MOVIE;
+                    buildButtons();
+                    focus();
+                    return;
+                }
+                showSeasons(m);
+            });
+            return;
+        }
         if (item.kind == Model.MOVIE) {
             if (Source.XTREAM.equals(s.type) && (item.plot == null || item.plot.isEmpty() || item.backdrop == null)) {
                 a.cat.async(() -> {
@@ -251,13 +290,21 @@ final class DetailsView {
         if (item.kind == Model.MOVIE) {
             Library.Progress p = a.lib.progress(item);
             long pos = fromStart || p == null || p.finished() ? 0 : p.pos;
-            PlayerActivity.play(a, List.of(item), 0, pos);
+            if (item.fromAddon()) chooseStream(item, () -> PlayerActivity.play(a, List.of(item), 0, pos));
+            else PlayerActivity.play(a, List.of(item), 0, pos);
             return;
         }
-        if (seasons.isEmpty()) {
+        Model.Item ep = nextToPlay();
+        if (ep == null) {
             Toast.makeText(a, "Épisodes en cours de chargement…", Toast.LENGTH_SHORT).show();
             return;
         }
+        playEpisode(ep);
+    }
+
+    /** a series' episode Play goes to: the one left off, the next if it was finished, else the first */
+    private Model.Item nextToPlay() {
+        if (seasons.isEmpty()) return null;
         Library.Progress p = a.lib.lastEpisode(item.id);
         Model.Item ep;
         if (p == null) ep = seasons.values().iterator().next().get(0);
@@ -265,8 +312,7 @@ final class DetailsView {
             ep = nextEpisode(p.item);
             if (ep == null) ep = find(p.item);
         } else ep = find(p.item);
-        if (ep == null) ep = seasons.values().iterator().next().get(0);
-        playEpisode(ep);
+        return ep != null ? ep : seasons.values().iterator().next().get(0);
     }
 
     /** plays an episode, with the rest of the series queued after it */
@@ -276,7 +322,68 @@ final class DetailsView {
         int idx = 0;
         for (int i = 0; i < all.size(); i++) if (all.get(i).id.equals(ep.id)) idx = i;
         Library.Progress p = a.lib.progress(all.get(idx));
-        PlayerActivity.play(a, all, idx, p != null && !p.finished() ? p.pos : 0);
+        long pos = p != null && !p.finished() ? p.pos : 0;
+        if (!ep.fromAddon()) {
+            PlayerActivity.play(a, all, idx, pos);
+            return;
+        }
+        // the next episodes find their stream when they come, like the one chosen here
+        for (Model.Item e : all) e.url = null;
+        Model.Item first = all.get(idx);
+        int at = idx;
+        chooseStream(first, () -> PlayerActivity.play(a, all, at, pos));
+    }
+
+    /**
+     * asks every source at once for a film's or an episode's links, in a window that shows each
+     * one's search as it goes; the link picked plays
+     */
+    private void chooseStream(Model.Item target, Runnable play) {
+        String subLang = a.getSharedPreferences("player", android.content.Context.MODE_PRIVATE).getString("subLang", null);
+        String title = target.kind == Model.EPISODE
+                ? item.name + "  ·  S" + target.season + " É" + target.episode + (target.name == null ? "" : " — " + target.name)
+                : target.name;
+        StreamPicker[] holder = new StreamPicker[1];
+        StreamPicker picker = new StreamPicker(a, title, s -> {
+            target.url = s.url;
+            target.bingeGroup = s.bingeGroup;
+            target.headers = s.headers;
+            target.source = s.source();
+            // the player falls back on the others, and sees those found after it started
+            target.alternatives = holder[0].streams();
+            play.run();
+        });
+        holder[0] = picker;
+        picker.backdrop(item.backdrop != null && !item.backdrop.isEmpty() ? item.backdrop : item.image);
+        // the source that played this title last time plays again as soon as it answers
+        String last = PlayerActivity.lastSource(a, target);
+        if (last != null) picker.resumeWith(last);
+        Addons ad = Addons.get(a);
+        a.cat.async(() -> {
+            target.subs = ad.subtitles(target, subLang);
+            return true;
+        }, ok -> {
+        });
+        for (String name : ad.streams(target, (name, found) -> a.ui.post(() -> picker.done(name, found)))) picker.pending(name);
+        Plugins plugins = Plugins.get(a);
+        boolean anyPlugin = false;
+        for (Plugins.Scraper sc : plugins.scrapers()) if (sc.enabled) anyPlugin = true;
+        if (anyPlugin) {
+            String name = "Plugins Nuvio";
+            picker.pending(name);
+            a.cat.async(() -> {
+                // each script's links show as soon as it answers; the row waits for the rest
+                Future<List<Addons.Stream>> f = plugins.future(target, part -> a.ui.post(() -> picker.partial(name, part)));
+                try {
+                    f.get(45, TimeUnit.SECONDS);
+                    return new ArrayList<Addons.Stream>();
+                } catch (Exception e) {
+                    f.cancel(true);
+                    return null;
+                }
+            }, found -> picker.done(name, found));
+        }
+        picker.show();
     }
 
     private Model.Item find(Model.Item e) {

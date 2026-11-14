@@ -3,3 +3,6 @@ build/
 local.properties
 pitv.keystore
 .DS_Store
+jsmodules/node_modules/
+jsmodules/package-lock.json
+.kotlin/

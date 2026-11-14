@@ -8,11 +8,12 @@ films and series from an **Xtream Codes** login or an **M3U playlist**, with a p
 | Page | What's on it |
 |---|---|
 | **Accueil** | Continuer à regarder, channels watched lately, Ma liste, recently added films and series |
-| **TV en direct** | Categories, their channels with what's on now, and the highlighted channel's guide |
-| **Films**, **Séries** | A row per category, the most recent first; OK opens the details page |
+| **TV en direct** | Categories, their channels with what's on now, and the highlighted channel's guide. The highlighted channel plays in a small muted preview once the highlight rests on it for a second |
+| **Films**, **Séries** | A row per category, the most recent first, and the add-ons' catalogues; OK opens the details page |
+| **Animes** | The anime add-ons' catalogues (Kitsu by default) |
 | **Ma liste** | Favourite channels, films and series (Pause on a card adds or removes it) |
-| **Recherche** | Channels, films and series whose name contains what you type |
-| **Paramètres** | The provider, and the address for filling it in from a phone |
+| **Recherche** | Channels, films and series whose name contains what you type, then the add-ons' results |
+| **Paramètres** | Three tabs: **IPTV** (the provider, and the address for filling it in from a phone), **Add-ons** (the Stremio add-ons and what each brings) and **Plugins** (the Nuvio plugins) |
 
 In the player:
 
@@ -20,9 +21,28 @@ In the player:
 |---|---|---|
 | Up / Down | Previous / next channel in the category | Shows the controls |
 | OK | List of the category's channels | Pause / play, or the controls |
-| Left / Right | Controls (Audio, Sous-titres, Format) | Back 10 s / forward 10 s (faster when held) |
-| Play / Pause | Shows the info | Pause / play |
+| Left / Right | Controls (Pause, Audio, Sous-titres, Format); once paused, back 10 s / forward 10 s | Back 10 s / forward 10 s (faster when held) |
+| Play / Pause | Pauses the channel, then resumes it where it was | Pause / play |
 | Back | Hides the controls, then leaves | Same; the position is saved |
+
+On Pi Home, highlighting Pi TV shows its row: the films and episodes of Continuer à regarder,
+then the recent channels. Choosing one opens Pi TV on it: a film's page, ready to resume, or the
+channel playing. The app publishes them to the Android TV provider each time it comes back to the
+front or the player stops; `install.sh` makes the channel visible (a stock launcher would ask).
+
+### Pausing live TV
+
+Pause on a channel records it on the Pi from that moment, and the picture stays on the moment
+paused. Lecture resumes from there, behind live (« En différé », with how far behind). The arrows
+then go back or forward 10 s, from the pause up to live; past the end, or with the Direct button,
+it's live again. The recording keeps up to 2 GB (about an hour), and is dropped when you change
+channel or leave the player.
+
+- Normal viewing doesn't change: the recording starts only on Pause, and takes over the
+  connection (providers often allow just one).
+- It works on MPEG-TS streams: Xtream channels, `.ts` addresses, and HLS whose segments are
+  MPEG-TS (most of iptv-org). An encrypted HLS stream, or one with separate audio, says « Pause
+  indisponible sur cette chaîne » and resumes live.
 
 ## Providers
 
@@ -36,6 +56,48 @@ In the player:
   `url-tvg` / `x-tvg-url`, or the XMLTV link in Paramètres.
 
 The phone form runs only while Paramètres is on screen, on port 8765.
+
+## Add-ons
+
+Pi TV speaks the [Stremio add-on protocol](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/protocol.md):
+plain JSON at `{base}/manifest.json`, then `{base}/{catalog|meta|stream|subtitles}/{type}/{id}.json`.
+Add-ons are added in Paramètres → Add-ons (a `manifest.json` link; `stremio://` works too) or on
+the phone page (one link per line). Each one has a switch: switched off, it stays listed (greyed)
+but brings no rows, search results, pages, links or subtitles until switched back on.
+
+| Add-on resource | What Pi TV does with it |
+|---|---|
+| `catalog` | Rows in Films, Séries and Animes (up to 4 per add-on and kind); catalogues that take a search answer Recherche |
+| `meta` | The details page: story, backdrop, cast, seasons and episodes |
+| `stream` | OK on Lecture asks every add-on at once; one stream plays, several are offered. The next episode takes the same kind of stream (`bingeGroup`) by itself |
+| `subtitles` | Added to the player, one per language: French and English, and the language chosen last |
+
+The defaults play nothing: **Cinemeta** (films and series), **Anime Kitsu** (anime) and
+**OpenSubtitles**. Streams come only from add-ons the user adds; Pi TV plays direct HTTP and HLS
+links, not torrents. Add-on titles work like the provider's: Ma liste, resume points and
+« Continuer à regarder » (which reopens the title's page, since stream links expire). Catalogues
+and manifests are cached on disk for 6 hours; searches always ask the add-ons again.
+
+## Plugins
+
+The Plugins page takes repositories of [Nuvio](https://github.com/nuvionline) scrapers — small
+JavaScript files that find French film, series and anime streams. Paste a `manifest.json` link
+(Gowaru's repo: `https://raw.githubusercontent.com/Gowaru/gowaru-nuvio-providers/main/manifest.json`).
+The scripts download to `files/plugins/`, are listed with their versions, and can be switched off
+one by one.
+
+Each script exports `getStreams(tmdbId, mediaType, season, episode)`; Pi TV runs it in a QuickJS
+engine (`quickjs-kt`) on a worker, with `fetch`, `console`, `atob`/`btoa`, `URL` and
+`AbortController` wired to Java, and no `setTimeout` (the scripts busy-wait instead). The
+collection stops after 32 s of results or 75 s per script; torrents and dead links are dropped.
+A stream's `Referer`/`User-Agent` headers go to the player, and the next episode is looked up in
+the same script (`bingeGroup = plugin:<repo>#<scraper>`). A scraper's answer for a title is kept
+in memory for an hour (most links stay valid for hours; the cache drops when a script changes or
+a repo is removed), so asking again is instant. The id that scripts want (a TMDB id)
+is resolved by Cinemeta: the meta's `moviedb_id`, or a search on title and year.
+
+Streams from plugins are asked at the same time as the add-ons'; on Lecture the two lists merge,
+plugins after the add-ons, best quality first.
 
 ## Reliability
 
@@ -93,9 +155,15 @@ Git.
 | `Rows` | Rows of posters that scroll sideways, the highlight pinned at the start |
 | `DetailsView` | A film's or series' page: play, resume, Ma liste, seasons and episodes |
 | `LivePage` | TV en direct: categories, channels, guide |
+| `Preview` | The highlighted channel, small and muted; released before full screen, which needs the Pi's video decoder |
 | `PlayerActivity` | Media3 playback, reconnects, zapping, tracks, resume points |
+| `Timeshift` | A paused channel recorded to a ring file, and read back as a stream |
 | `SettingsPage`, `SetupServer` | The provider's details, on the TV or from a phone |
 | `Catalog` | Loads and caches the lists; search |
+| `Addons` | Stremio add-ons: manifests, catalogues, details, streams, subtitles |
+| `Plugins`, `PluginRuntime`, `PluginsPage` | Nuvio JS scrapers: repositories, the QuickJS engine, the Plugins page |
+| `Tmdb` | Cinemeta ids for the scrapers (moviedb_id, search by title) |
 | `Xtream`, `M3u`, `Epg` | The provider formats and the XMLTV guide |
 | `Library` | Favourites, resume points and recent channels, one file per provider |
+| `TvHome` | The launcher's row: Continuer à regarder (watch-next) and Chaînes récentes (a preview channel) |
 | `Images` | Poster and logo loading with memory and disk caches |

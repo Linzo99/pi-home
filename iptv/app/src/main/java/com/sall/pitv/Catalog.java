@@ -69,8 +69,19 @@ final class Catalog {
         listeners.remove(l);
     }
 
+    /** the add-ons' catalogues, read in the background; the pages refresh when they arrive */
+    void loadAddons(boolean force) {
+        pool.execute(() -> {
+            Addons.get(app).load(force);
+            ui.post(() -> {
+                for (Listener l : listeners) l.onCatalog();
+            });
+        });
+    }
+
     /** loads from the cache, then refreshes whatever is stale (all of it when force) */
     void load(boolean force) {
+        loadAddons(force);
         worker.execute(() -> {
             Source s = Source.load(app);
             source = s;

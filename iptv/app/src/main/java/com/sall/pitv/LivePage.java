@@ -35,6 +35,7 @@ final class LivePage {
     private final TextView infoName, infoNow, infoTime, infoDesc, infoNext, header;
     private final ProgressBar infoBar;
     private Model.Item shown;
+    private final Preview preview;
     private final Runnable pickCat = this::applyCat;
     private int pendingCat = -1;
 
@@ -62,9 +63,19 @@ final class LivePage {
         LinearLayout info = new LinearLayout(a);
         info.setOrientation(LinearLayout.VERTICAL);
         info.setPadding(a.dp(22), a.dp(4), a.dp(8), 0);
+        // the highlighted channel plays here; its logo shows until the picture comes
+        FrameLayout box = new FrameLayout(a);
+        box.setBackgroundColor(0xFF1A1A1A);
+        android.view.SurfaceView surface = new android.view.SurfaceView(a);
+        box.addView(surface, new FrameLayout.LayoutParams(-1, -1));
+        FrameLayout cover = new FrameLayout(a);
+        cover.setBackgroundColor(0xFF1A1A1A);
         infoLogo = new ImageView(a);
-        infoLogo.setScaleType(ImageView.ScaleType.FIT_START);
-        info.addView(infoLogo, new LinearLayout.LayoutParams(a.dp(120), a.dp(56)));
+        infoLogo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        cover.addView(infoLogo, new FrameLayout.LayoutParams(a.dp(120), a.dp(56), Gravity.CENTER));
+        box.addView(cover, new FrameLayout.LayoutParams(-1, -1));
+        info.addView(box, new LinearLayout.LayoutParams(a.dp(320), a.dp(180)));
+        preview = new Preview(a, a.cat, surface, cover);
         infoName = Ui.line(a, 18, Color.WHITE, true);
         info.addView(infoName, Ui.margins(-1, -2, 0, a.dp(10), 0, 0));
         infoNow = Ui.text(a, 15, Color.WHITE, true);
@@ -75,7 +86,7 @@ final class LivePage {
         infoBar = bar();
         info.addView(infoBar, Ui.margins(a.dp(220), a.dp(3), 0, a.dp(6), 0, 0));
         infoDesc = Ui.text(a, 12, Ui.DIM, false);
-        infoDesc.setMaxLines(5);
+        infoDesc.setMaxLines(3);
         infoDesc.setLineSpacing(a.dp(2), 1f);
         infoDesc.setEllipsize(android.text.TextUtils.TruncateAt.END);
         info.addView(infoDesc, Ui.margins(-1, -2, 0, a.dp(10), 0, 0));
@@ -152,6 +163,16 @@ final class LivePage {
         return Math.max(0, ((Ui.PinnedLayout) r.getLayoutManager()).findFirstVisibleItemPosition());
     }
 
+    /** the player is released: full screen needs the video decoder, and a hidden page nothing */
+    void stopPreview() {
+        preview.stop();
+    }
+
+    /** back on the page with a channel highlighted: it plays again */
+    void resumePreview() {
+        if (chanList.hasFocus() && shown != null) preview.show(shown);
+    }
+
     /** Back from the channels goes to the categories first */
     boolean back() {
         if (chanList.hasFocus()) {
@@ -199,7 +220,7 @@ final class LivePage {
         int n = 0;
         for (Model.Prog p : up) {
             if (p == cur) continue;
-            if (n++ >= 6) break;
+            if (n++ >= 4) break;
             next.append(Ui.clock(p.start)).append("   ").append(p.title).append('\n');
         }
         infoNext.setText(next.length() == 0 ? "" : "À suivre\n" + next.toString().trim());
@@ -291,6 +312,16 @@ final class LivePage {
     }
 
     private final class ChanAdapter extends RecyclerView.Adapter<Holder> {
+        ChanAdapter() {
+            // a refresh (back from full screen) keeps the highlighted channel, and its preview
+            setHasStableIds(true);
+        }
+
+        @Override
+        public long getItemId(int pos) {
+            return channels.get(pos).key().hashCode();
+        }
+
         @NonNull
         @Override
         public Holder onCreateViewHolder(@NonNull ViewGroup p, int t) {
@@ -341,7 +372,15 @@ final class LivePage {
             style.run();
             h.itemView.setOnFocusChangeListener((v, has) -> {
                 style.run();
-                if (has) showInfo(ch);
+                if (has) {
+                    showInfo(ch);
+                    preview.show(ch);
+                } else {
+                    // left the channels (for the categories or the menu): the preview stops
+                    chanList.post(() -> {
+                        if (!chanList.hasFocus()) preview.stop();
+                    });
+                }
             });
             h.itemView.setOnClickListener(v -> a.playChannel(ch, channels));
             h.itemView.setOnKeyListener((v, key, e) -> {
