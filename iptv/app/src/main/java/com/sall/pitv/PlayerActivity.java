@@ -99,6 +99,8 @@ public class PlayerActivity extends Activity {
     private final java.util.ArrayDeque<Long> stalls = new java.util.ArrayDeque<>();
     /** the connection's speed has been measured in this run (20 s of playing) */
     private static boolean measured;
+    /** the link is being tried again without the headers its script gave */
+    private boolean bare;
     /** a seek waits for data too: that wait isn't the connection's fault */
     private long seekedAt;
     /** a link that doesn't start in time is given up for the next */
@@ -311,6 +313,8 @@ public class PlayerActivity extends Activity {
                 }
                 if (s == Player.STATE_READY) {
                     ui.removeCallbacks(startTimeout);
+                    // it played bare: this server is asked without headers from now on
+                    if (bare) getSharedPreferences("player", MODE_PRIVATE).edit().putBoolean("bare." + host(item.url), true).apply();
                     if (!live && item.source != null) saveSource(PlayerActivity.this, item);
                     message.setVisibility(View.GONE);
                     getSharedPreferences("player", MODE_PRIVATE).edit().putBoolean("geo." + item.key(), viaProxy).apply();
@@ -369,6 +373,15 @@ public class PlayerActivity extends Activity {
                 lastErrorNetwork = network;
                 // a link that never played is dead: the next one, at once; one that played gets
                 // a couple of tries first
+                // some servers refuse the Referer a script insists on (Vidlink's video host
+                // answers 429 with it, 206 without): the same link once more, bare
+                if (canFallBack() && !playedOnRoute && !bare && item.headers != null && !item.headers.isEmpty()
+                        && e.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) {
+                    bare = true;
+                    android.util.Log.i("PiTV", "retrying without the script's headers: " + host(item.url));
+                    start(resumeAt);
+                    return;
+                }
                 if (canFallBack() && (!playedOnRoute || retries >= 2)) {
                     nextLink(false, e.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ? "Le serveur refuse ce lien"
                             : network ? "Ce lien ne répond pas" : "Ce lien ne se lit pas");
@@ -429,6 +442,7 @@ public class PlayerActivity extends Activity {
                 || getSharedPreferences("player", MODE_PRIVATE).getBoolean("geo." + item.key(), false));
         retries = 0;
         resumeAt = pos;
+        bare = false;
         tried.clear();
         stalls.clear();
         ui.removeCallbacks(startTimeout);
@@ -456,8 +470,10 @@ public class PlayerActivity extends Activity {
         // an add-on episode still looking for its stream
         if (item.url == null || item.url.isEmpty()) return;
         String url = streamUrl();
-        // a plugin's link often needs the Referer / User-Agent its script returned
-        Map<String, String> headers = item.headers == null ? java.util.Collections.emptyMap() : item.headers;
+        // a plugin's link often needs the Referer / User-Agent its script returned, unless the
+        // server is known to refuse them
+        boolean noHeaders = bare || getSharedPreferences("player", MODE_PRIVATE).getBoolean("bare." + host(url), false);
+        Map<String, String> headers = item.headers == null || noHeaders ? java.util.Collections.emptyMap() : item.headers;
         if (http != null) http.setDefaultRequestProperties(headers);
         if (okhttp != null) okhttp.setDefaultRequestProperties(headers);
         MediaItem.Builder b = new MediaItem.Builder().setUri(Uri.parse(url));
@@ -530,21 +546,8 @@ public class PlayerActivity extends Activity {
             return;
         }
         // until something has played a while, the meter only guesses: the last real measure is better
-        long bandwidth = androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.getSingletonInstance(this).getBitrateEstimate();
-        long saved = getSharedPreferences("player", MODE_PRIVATE).getLong("bandwidth", 0);
-        if (!measured && saved > 0) bandwidth = saved;
-        Addons.Stream pick = null;
-        for (Addons.Stream x : left) {
-            // the list is best first: the first that fits is the best that fits
-            if (needs(x.quality()) <= bandwidth * 8 / 10) {
-                pick = x;
-                break;
-            }
-        }
-        if (pick == null) {
-            // none fits the measure: the lightest one
-            for (Addons.Stream x : left) if (pick == null || (x.quality() > 0 && (pick.quality() == 0 || x.quality() < pick.quality()))) pick = x;
-        }
+        long bandwidth = bandwidth(this);
+        Addons.Stream pick = bestFor(this, left);
         long pos = playedOnRoute ? Math.max(0, player.getCurrentPosition()) : resumeAt;
         item.url = pick.url;
         item.headers = pick.headers;
@@ -557,9 +560,38 @@ public class PlayerActivity extends Activity {
         spinner.setVisibility(View.VISIBLE);
         retries = 0;
         playedOnRoute = false;
+        bare = false;
         stalls.clear();
         resumeAt = pos;
         start(pos);
+    }
+
+    private static String host(String url) {
+        try {
+            return Uri.parse(url).getHost();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** the connection's speed in bit/s: measured while playing, else the last measure, else a guess */
+    static long bandwidth(Context c) {
+        long b = androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.getSingletonInstance(c).getBitrateEstimate();
+        // until something has played a while, the meter only guesses: the last real measure is better
+        long saved = c.getSharedPreferences("player", MODE_PRIVATE).getLong("bandwidth", 0);
+        return !measured && saved > 0 ? saved : b;
+    }
+
+    /** of links listed best first: the best the connection carries, else the lightest; null if none */
+    static Addons.Stream bestFor(Context c, List<Addons.Stream> links) {
+        long bandwidth = bandwidth(c);
+        for (Addons.Stream x : links) if (x.url != null && !x.url.isEmpty() && needs(x.quality()) <= bandwidth * 8 / 10) return x;
+        Addons.Stream pick = null;
+        for (Addons.Stream x : links) {
+            if (x.url == null || x.url.isEmpty()) continue;
+            if (pick == null || (x.quality() > 0 && (pick.quality() == 0 || x.quality() < pick.quality()))) pick = x;
+        }
+        return pick;
     }
 
     /** the source that played a title (a series, for its episodes), to take it again next time */

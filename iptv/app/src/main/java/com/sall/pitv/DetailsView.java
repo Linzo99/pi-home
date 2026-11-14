@@ -113,7 +113,7 @@ final class DetailsView {
                 @Override
                 public void onClick(Object o) {
                     Model.Item e = o instanceof Library.Progress ? ((Library.Progress) o).item : (Model.Item) o;
-                    playEpisode(e);
+                    playEpisode(e, false);
                 }
             });
             episodesRow.setPadding(a.dp(16), 0, 0, 0);
@@ -173,11 +173,19 @@ final class DetailsView {
         } else {
             label = p != null && !p.finished() && p.pos > 30_000 ? "Reprendre · " + Ui.duration(p.dur - p.pos) + " restantes" : "Lecture";
         }
-        playButton = Ui.button(a, R.drawable.ic_play, label, v -> play(false));
+        playButton = Ui.button(a, R.drawable.ic_play, label, v -> play(false, false));
         playButton.setTag("first");
+        // a long press: the list of links, to choose one
+        playButton.setOnLongClickListener(v -> {
+            play(false, true);
+            return true;
+        });
         buttons.addView(playButton);
         if (item.kind == Model.MOVIE && p != null && p.pos > 30_000) {
-            buttons.addView(Ui.button(a, R.drawable.ic_replay, "Depuis le début", v -> play(true)), Ui.margins(-2, -2, a.dp(12), 0, 0, 0));
+            buttons.addView(Ui.button(a, R.drawable.ic_replay, "Depuis le début", v -> play(true, false)), Ui.margins(-2, -2, a.dp(12), 0, 0, 0));
+        }
+        if (item.fromAddon()) {
+            buttons.addView(Ui.button(a, R.drawable.ic_list, "Sources", v -> play(false, true)), Ui.margins(-2, -2, a.dp(12), 0, 0, 0));
         }
         boolean fav = a.lib.isFav(item);
         favButton = Ui.button(a, fav ? R.drawable.ic_fav : R.drawable.ic_fav_border, fav ? "Dans Ma liste" : "Ma liste", v -> {
@@ -286,11 +294,13 @@ final class DetailsView {
         episodesRow.setRows(r);
     }
 
-    private void play(boolean fromStart) {
+    /** Play: a film, or the series' episode it's at; [pick] shows the links to choose one */
+    private void play(boolean fromStart, boolean pick) {
+        if (quickCancel != null) return;
         if (item.kind == Model.MOVIE) {
             Library.Progress p = a.lib.progress(item);
             long pos = fromStart || p == null || p.finished() ? 0 : p.pos;
-            if (item.fromAddon()) chooseStream(item, () -> PlayerActivity.play(a, List.of(item), 0, pos));
+            if (item.fromAddon()) findStream(item, () -> PlayerActivity.play(a, List.of(item), 0, pos), pick);
             else PlayerActivity.play(a, List.of(item), 0, pos);
             return;
         }
@@ -299,7 +309,7 @@ final class DetailsView {
             Toast.makeText(a, "Épisodes en cours de chargement…", Toast.LENGTH_SHORT).show();
             return;
         }
-        playEpisode(ep);
+        playEpisode(ep, pick);
     }
 
     /** a series' episode Play goes to: the one left off, the next if it was finished, else the first */
@@ -316,7 +326,7 @@ final class DetailsView {
     }
 
     /** plays an episode, with the rest of the series queued after it */
-    private void playEpisode(Model.Item ep) {
+    private void playEpisode(Model.Item ep, boolean pick) {
         List<Model.Item> all = new ArrayList<>();
         for (List<Model.Item> l : seasons.values()) all.addAll(l);
         int idx = 0;
@@ -331,7 +341,99 @@ final class DetailsView {
         for (Model.Item e : all) e.url = null;
         Model.Item first = all.get(idx);
         int at = idx;
-        chooseStream(first, () -> PlayerActivity.play(a, all, at, pos));
+        findStream(first, () -> PlayerActivity.play(a, all, at, pos), pick);
+    }
+
+    private void findStream(Model.Item target, Runnable play, boolean pick) {
+        if (pick) chooseStream(target, play);
+        else quickStream(target, play);
+    }
+
+    /** the quiet search Play runs; Back stops it */
+    private Runnable quickCancel;
+
+    /**
+     * Play without the list: the source that played this title last time the moment it answers,
+     * else after a few seconds (or once every source has answered) the best link the connection
+     * carries. The player falls back on the others, including those found after it started.
+     */
+    private void quickStream(Model.Item target, Runnable play) {
+        String last = PlayerActivity.lastSource(a, target);
+        CharSequence label = playButton.getText();
+        playButton.setText("Recherche d'un lien…");
+        List<Addons.Stream> found = new ArrayList<>();
+        int[] pending = {0};
+        boolean[] over = {false};
+        long t0 = System.currentTimeMillis();
+        Runnable stop = () -> {
+            over[0] = true;
+            quickCancel = null;
+            if (playButton.isAttachedToWindow()) playButton.setText(label);
+        };
+        quickCancel = stop;
+        Runnable decide = () -> {
+            if (over[0]) return;
+            Addons.Stream pick = null;
+            if (last != null) for (Addons.Stream x : found) if (last.equals(x.source())) {
+                pick = x;
+                break;
+            }
+            if (pick == null && (System.currentTimeMillis() - t0 >= 5_000 || pending[0] == 0)) pick = PlayerActivity.bestFor(a, found);
+            if (pick == null) {
+                if (pending[0] == 0) {
+                    stop.run();
+                    Toast.makeText(a, "Aucun lien trouvé pour ce titre", Toast.LENGTH_LONG).show();
+                }
+                return;
+            }
+            stop.run();
+            target.url = pick.url;
+            target.bingeGroup = pick.bingeGroup;
+            target.headers = pick.headers;
+            target.source = pick.source();
+            target.alternatives = found;
+            play.run();
+        };
+        java.util.function.Consumer<List<Addons.Stream>> add = l -> {
+            if (l == null || l.isEmpty()) return;
+            found.addAll(l);
+            found.sort(java.util.Comparator.comparingInt(Addons.Stream::quality).reversed());
+        };
+        String subLang = a.getSharedPreferences("player", android.content.Context.MODE_PRIVATE).getString("subLang", null);
+        Addons ad = Addons.get(a);
+        a.cat.async(() -> {
+            target.subs = ad.subtitles(target, subLang);
+            return true;
+        }, ok -> {
+        });
+        pending[0] += ad.streams(target, (name, l) -> a.ui.post(() -> {
+            pending[0]--;
+            add.accept(l);
+            decide.run();
+        })).size();
+        Plugins plugins = Plugins.get(a);
+        boolean anyPlugin = false;
+        for (Plugins.Scraper sc : plugins.scrapers()) if (sc.enabled) anyPlugin = true;
+        if (anyPlugin) {
+            pending[0]++;
+            a.cat.async(() -> {
+                Future<List<Addons.Stream>> f = plugins.future(target, part -> a.ui.post(() -> {
+                    add.accept(part);
+                    decide.run();
+                }));
+                try {
+                    f.get(45, TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    f.cancel(true);
+                }
+                return true;
+            }, ok -> {
+                pending[0]--;
+                decide.run();
+            });
+        }
+        a.ui.postDelayed(decide, 5_000);
+        decide.run();
     }
 
     /**
@@ -355,9 +457,7 @@ final class DetailsView {
         });
         holder[0] = picker;
         picker.backdrop(item.backdrop != null && !item.backdrop.isEmpty() ? item.backdrop : item.image);
-        // the source that played this title last time plays again as soon as it answers
-        String last = PlayerActivity.lastSource(a, target);
-        if (last != null) picker.resumeWith(last);
+        // opened to choose: nothing plays by itself (Play is the one that resumes the last source)
         Addons ad = Addons.get(a);
         a.cat.async(() -> {
             target.subs = ad.subtitles(target, subLang);
@@ -420,6 +520,11 @@ final class DetailsView {
 
     /** Back: false to close the page */
     boolean back() {
+        // Back during Play's search stops it, and stays on the page
+        if (quickCancel != null) {
+            quickCancel.run();
+            return true;
+        }
         return false;
     }
 }
