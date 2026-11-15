@@ -354,11 +354,14 @@ final class DetailsView {
 
     /**
      * Play without the list: the source that played this title last time the moment it answers,
-     * else after a few seconds (or once every source has answered) the best link the connection
+     * else on a title never played the add-on or script of the last link played anywhere (its best
+     * link for the connection), else after a few seconds (or once every source has answered) the best link the connection
      * carries. The player falls back on the others, including those found after it started.
      */
     private void quickStream(Model.Item target, Runnable play) {
         String last = PlayerActivity.lastSource(a, target);
+        String latest = last != null ? null : PlayerActivity.latestSource(a);
+        String provider = latest == null ? null : latest.substring(0, Math.max(0, latest.indexOf('|')));
         CharSequence label = playButton.getText();
         playButton.setText("Recherche d'un lien…");
         List<Addons.Stream> found = new ArrayList<>();
@@ -377,6 +380,11 @@ final class DetailsView {
             if (last != null) for (Addons.Stream x : found) if (last.equals(x.source())) {
                 pick = x;
                 break;
+            }
+            if (pick == null && provider != null && !provider.isEmpty()) {
+                List<Addons.Stream> exact = new ArrayList<>(), same = new ArrayList<>();
+                for (Addons.Stream x : found) if (provider.equals(x.addon)) (latest.equals(x.source()) ? exact : same).add(x);
+                pick = PlayerActivity.bestFor(a, exact.isEmpty() ? same : exact);
             }
             if (pick == null && (System.currentTimeMillis() - t0 >= 5_000 || pending[0] == 0)) pick = PlayerActivity.bestFor(a, found);
             if (pick == null) {

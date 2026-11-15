@@ -599,8 +599,13 @@ public class PlayerActivity extends Activity {
         return c.getSharedPreferences("player", MODE_PRIVATE).getString(sourceKey(i), null);
     }
 
+    /** the source of the last link played, whatever the title: tried first on a title never played */
+    static String latestSource(Context c) {
+        return c.getSharedPreferences("player", MODE_PRIVATE).getString("src.latest", null);
+    }
+
     private static void saveSource(Context c, Model.Item i) {
-        c.getSharedPreferences("player", MODE_PRIVATE).edit().putString(sourceKey(i), i.source).apply();
+        c.getSharedPreferences("player", MODE_PRIVATE).edit().putString(sourceKey(i), i.source).putString("src.latest", i.source).apply();
     }
 
     private static String sourceKey(Model.Item i) {
