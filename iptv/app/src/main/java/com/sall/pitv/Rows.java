@@ -27,17 +27,31 @@ final class Rows extends RecyclerView {
     static final int POSTER = 0, WIDE = 1, CHANNEL = 2;
     /** a collection's folders (Folders.Folder), as wide or tall tiles */
     static final int FOLDER_WIDE = 3, FOLDER_TALL = 4;
+    /** the "Voir tout" tile closing a row that has a full page */
+    private static final int MORE = 5;
 
     static final class Row {
         final String title;
         final int style;
         /** Model.Item, Library.Progress for "continue watching", or Folders.Folder */
         final List<Object> items;
+        /** what its full page shows: an add-on's catalogue (Addons.Row) or a category (Model.Category) */
+        Object all;
 
         Row(String title, int style, List<?> items) {
             this.title = title;
             this.style = style;
             this.items = new ArrayList<>(items);
+        }
+
+        Row all(Object o) {
+            all = o;
+            return this;
+        }
+
+        /** its cards, with the "Voir tout" tile */
+        int count() {
+            return items.size() + (all != null && !items.isEmpty() ? 1 : 0);
         }
     }
 
@@ -48,6 +62,10 @@ final class Rows extends RecyclerView {
 
         /** Pause (or Menu) on a card: favourite it, for instance */
         default void onMenu(Object item) {
+        }
+
+        /** the "Voir tout" tile of a row */
+        default void onAll(Row row) {
         }
     }
 
@@ -75,6 +93,7 @@ final class Rows extends RecyclerView {
         pool.setMaxRecycledViews(CHANNEL, 24);
         pool.setMaxRecycledViews(FOLDER_WIDE, 24);
         pool.setMaxRecycledViews(FOLDER_TALL, 24);
+        pool.setMaxRecycledViews(MORE, 12);
         setAdapter(new RowAdapter());
     }
 
@@ -134,7 +153,7 @@ final class Rows extends RecyclerView {
     private void focusIn(RowHolder h) {
         Row r = h.cards.row;
         if (r == null || r.items.isEmpty()) return;
-        int at = Math.min(left.getOrDefault(r.title, 0), r.items.size() - 1);
+        int at = Math.min(left.getOrDefault(r.title, 0), r.count() - 1);
         View v = h.list.getLayoutManager().findViewByPosition(at);
         if (v != null) {
             v.requestFocus();
@@ -192,7 +211,7 @@ final class Rows extends RecyclerView {
             h.title.setText(r.title);
             h.cards.row = r;
             h.cards.notifyDataSetChanged();
-            int at = Math.min(left.getOrDefault(r.title, 0), r.items.size() - 1);
+            int at = Math.min(left.getOrDefault(r.title, 0), r.count() - 1);
             ((LinearLayoutManager) h.list.getLayoutManager()).scrollToPositionWithOffset(Math.max(0, at), 0);
         }
 
@@ -202,7 +221,7 @@ final class Rows extends RecyclerView {
         }
     }
 
-    private static final class CardHolder extends ViewHolder {
+    static final class CardHolder extends ViewHolder {
         final ImageView image;
         final TextView name, sub;
         final ProgressBar bar;
@@ -224,23 +243,35 @@ final class Rows extends RecyclerView {
 
         @Override
         public int getItemViewType(int pos) {
-            return row.style;
+            return pos < row.items.size() ? row.style : MORE;
         }
 
         @NonNull
         @Override
         public CardHolder onCreateViewHolder(@NonNull ViewGroup parent, int style) {
-            return card(parent.getContext(), style);
+            return style == MORE ? moreCard(parent.getContext()) : card(parent.getContext(), style);
         }
 
         @Override
         public void onBindViewHolder(@NonNull CardHolder h, int pos) {
-            Object o = row.items.get(pos);
-            bind(h, o, row.style);
-            h.itemView.setOnClickListener(v -> cb.onClick(o));
+            boolean more = pos >= row.items.size();
+            Object o = more ? null : row.items.get(pos);
+            if (more) {
+                // as tall as the row's cards
+                ViewGroup.LayoutParams lp = h.itemView.getLayoutParams();
+                int[] size = size(getContext(), row.style);
+                lp.width = Math.min(size[0], Ui.dp(getContext(), 150));
+                lp.height = size[1];
+                h.itemView.setLayoutParams(lp);
+            } else bind(h, o, row.style);
+            Row r = row;
+            h.itemView.setOnClickListener(v -> {
+                if (more) cb.onAll(r);
+                else cb.onClick(o);
+            });
             h.itemView.setOnKeyListener((v, key, e) -> {
                 if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
-                if (key == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || key == KeyEvent.KEYCODE_MEDIA_PAUSE || key == KeyEvent.KEYCODE_MENU) {
+                if (!more && (key == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || key == KeyEvent.KEYCODE_MEDIA_PAUSE || key == KeyEvent.KEYCODE_MENU)) {
                     cb.onMenu(o);
                     return true;
                 }
@@ -257,35 +288,54 @@ final class Rows extends RecyclerView {
                 h.grow.onFocusChange(v, has);
                 if (has) {
                     left.put(row.title, pos);
-                    cb.onFocus(o);
+                    if (!more) cb.onFocus(o);
                 }
             });
         }
 
         @Override
         public int getItemCount() {
-            return row == null ? 0 : row.items.size();
+            return row == null ? 0 : row.count();
         }
     }
 
     // ---------------------------------------------------------------- cards
 
-    private CardHolder card(Context c, int style) {
-        int w, h;
+    /** a card's width and height */
+    private static int[] size(Context c, int style) {
+        if (style == POSTER) return new int[] {Ui.dp(c, 104), Ui.dp(c, 156)};
+        if (style == FOLDER_TALL) return new int[] {Ui.dp(c, 120), Ui.dp(c, 180)};
+        if (style == FOLDER_WIDE) return new int[] {Ui.dp(c, 240), Ui.dp(c, 135)};
+        int w = Ui.dp(c, style == CHANNEL ? 150 : 196);
+        return new int[] {w, w * 9 / 16};
+    }
+
+    /** "Voir tout": a glass tile with an arrow */
+    private static CardHolder moreCard(Context c) {
+        FrameLayout f = new FrameLayout(c);
+        f.setFocusable(true);
+        f.setClickable(true);
+        f.setBackground(Ui.glass(c, Ui.dp(c, 6), 1));
+        RecyclerView.LayoutParams lp = new RecyclerView.LayoutParams(Ui.dp(c, 104), Ui.dp(c, 156));
+        lp.rightMargin = Ui.dp(c, 10);
+        f.setLayoutParams(lp);
+        TextView t = Ui.text(c, 13, Color.WHITE, true);
+        t.setText("Voir tout");
+        t.setGravity(Gravity.CENTER);
+        android.graphics.drawable.Drawable arrow = c.getDrawable(R.drawable.ic_chevron_right).mutate();
+        arrow.setTint(Color.WHITE);
+        arrow.setBounds(0, 0, Ui.dp(c, 28), Ui.dp(c, 28));
+        t.setCompoundDrawablesRelative(null, arrow, null, null);
+        t.setCompoundDrawablePadding(Ui.dp(c, 6));
+        f.addView(t, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+        Ui.focusCard(f, 1.1f);
+        return new CardHolder(f, new ImageView(c), t, null, null);
+    }
+
+    static CardHolder card(Context c, int style) {
+        int[] size = size(c, style);
+        int w = size[0], h = size[1];
         boolean folder = style == FOLDER_WIDE || style == FOLDER_TALL;
-        if (style == POSTER) {
-            w = Ui.dp(c, 104);
-            h = Ui.dp(c, 156);
-        } else if (style == FOLDER_TALL) {
-            w = Ui.dp(c, 120);
-            h = Ui.dp(c, 180);
-        } else if (style == FOLDER_WIDE) {
-            w = Ui.dp(c, 240);
-            h = Ui.dp(c, 135);
-        } else {
-            w = Ui.dp(c, style == CHANNEL ? 150 : 196);
-            h = w * 9 / 16;
-        }
         FrameLayout f = new FrameLayout(c);
         f.setFocusable(true);
         f.setClickable(true);
@@ -349,7 +399,10 @@ final class Rows extends RecyclerView {
     }
 
     private void bind(CardHolder h, Object o, int style) {
-        Context c = getContext();
+        bind(getContext(), h, o, style, episodeCards);
+    }
+
+    static void bind(Context c, CardHolder h, Object o, int style, boolean episodeCards) {
         if (o instanceof Folders.Folder) {
             Folders.Folder d = (Folders.Folder) o;
             // the cover carries the folder's name, often on a transparent logo: the text is only for tiles without one

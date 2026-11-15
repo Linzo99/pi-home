@@ -70,6 +70,10 @@ public class MainActivity extends Activity implements Catalog.Listener {
     /** a collection's folder, open over the Collections page: its view and the tile it came from */
     private View folderView, folderReturn;
     private TextView[] pageHero;
+    /** a catalogue's full page, over the page or the folder it was opened from */
+    private View gridView, gridUnder, gridReturn;
+    private TextView[] gridHero;
+    private String gridBackdrop;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -264,7 +268,11 @@ public class MainActivity extends Activity implements Catalog.Listener {
     }
 
     private void focusPage() {
-        if (folderView != null) {
+        if (gridView != null) {
+            Grid g = findGrid(gridView);
+            if (g != null && g.count() > 0) g.focusFirst();
+            else gridView.requestFocus();
+        } else if (folderView != null) {
             Rows r = findRows(folderView);
             if (r != null && !r.isEmpty()) r.focusFirst();
             else folderView.requestFocus();
@@ -283,6 +291,18 @@ public class MainActivity extends Activity implements Catalog.Listener {
                 else pageView.requestFocus();
             }
         }
+    }
+
+    private static Grid findGrid(View v) {
+        if (v instanceof Grid) return (Grid) v;
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                Grid r = findGrid(g.getChildAt(i));
+                if (r != null) return r;
+            }
+        }
+        return null;
     }
 
     private static Rows findRows(View v) {
@@ -311,6 +331,7 @@ public class MainActivity extends Activity implements Catalog.Listener {
         pluginsPage = null;
         addonsPage = null;
         folderView = null;
+        gridView = null;
         setBackdrop(null);
         switch (which) {
             case LIVE:
@@ -554,14 +575,14 @@ public class MainActivity extends Activity implements Catalog.Listener {
                 // the first catalogue of each add-on kind
                 Addons ad = Addons.get(this);
                 for (List<Addons.Row> l : List.of(ad.movies, ad.series, ad.anime)) {
-                    if (!l.isEmpty()) r.add(new Rows.Row(l.get(0).name, Rows.POSTER, l.get(0).items));
+                    if (!l.isEmpty()) r.add(new Rows.Row(l.get(0).name, Rows.POSTER, l.get(0).items).all(l.get(0)));
                 }
                 r.add(new Rows.Row("Chaînes favorites", Rows.CHANNEL, lib.favs(Model.LIVE)));
                 // a taste of each kind, so Home is never empty
                 int n = 0;
                 for (Model.Category c : cat.movies) {
                     if (n++ >= 4) break;
-                    r.add(new Rows.Row(c.name, Rows.POSTER, c.items.subList(0, Math.min(40, c.items.size()))));
+                    r.add(new Rows.Row(c.name, Rows.POSTER, c.items.subList(0, Math.min(40, c.items.size()))).all(c));
                 }
                 if (cat.allMovies.isEmpty() && cat.allSeries.isEmpty()) {
                     for (Model.Category c : cat.live) {
@@ -573,16 +594,16 @@ public class MainActivity extends Activity implements Catalog.Listener {
             }
             case MOVIES:
                 r.add(new Rows.Row("Ajoutés récemment", Rows.POSTER, Catalog.recent(cat.allMovies, 40)));
-                for (Addons.Row a : Addons.get(this).movies) r.add(new Rows.Row(a.name, Rows.POSTER, a.items));
-                for (Model.Category c : cat.movies) r.add(new Rows.Row(c.name + "  ·  " + c.items.size(), Rows.POSTER, c.items));
+                for (Addons.Row a : Addons.get(this).movies) r.add(new Rows.Row(a.name, Rows.POSTER, a.items).all(a));
+                for (Model.Category c : cat.movies) r.add(new Rows.Row(c.name + "  ·  " + c.items.size(), Rows.POSTER, c.items).all(c));
                 break;
             case SERIES:
                 r.add(new Rows.Row("Ajoutées récemment", Rows.POSTER, Catalog.recent(cat.allSeries, 40)));
-                for (Addons.Row a : Addons.get(this).series) r.add(new Rows.Row(a.name, Rows.POSTER, a.items));
-                for (Model.Category c : cat.series) r.add(new Rows.Row(c.name + "  ·  " + c.items.size(), Rows.POSTER, c.items));
+                for (Addons.Row a : Addons.get(this).series) r.add(new Rows.Row(a.name, Rows.POSTER, a.items).all(a));
+                for (Model.Category c : cat.series) r.add(new Rows.Row(c.name + "  ·  " + c.items.size(), Rows.POSTER, c.items).all(c));
                 break;
             case ANIME:
-                for (Addons.Row a : Addons.get(this).anime) r.add(new Rows.Row(a.name, Rows.POSTER, a.items));
+                for (Addons.Row a : Addons.get(this).anime) r.add(new Rows.Row(a.name, Rows.POSTER, a.items).all(a));
                 break;
             case COLLECTIONS:
                 if (collTab == 0) r.addAll(shelfRows());
@@ -697,6 +718,11 @@ public class MainActivity extends Activity implements Catalog.Listener {
             public void onClick(Object item) {
                 if (item instanceof Folders.Folder) openFolder((Folders.Folder) item);
                 else open(item);
+            }
+
+            @Override
+            public void onAll(Rows.Row row) {
+                openGrid(row);
             }
 
             @Override
@@ -831,7 +857,7 @@ public class MainActivity extends Activity implements Catalog.Listener {
                 pending[0]--;
                 // Netflix's films and Netflix's series: the same name twice, told apart by kind
                 String kind = "movie".equals(src[1]) ? "Films" : "anime".equals(src[1]) ? "Animes" : "Séries";
-                if (row != null) slots[at] = new Rows.Row(row.name + "  ·  " + kind, Rows.POSTER, row.items);
+                if (row != null) slots[at] = new Rows.Row(row.name + "  ·  " + kind, Rows.POSTER, row.items).all(row);
                 boolean first = rows.isEmpty();
                 List<Rows.Row> shown = new ArrayList<>();
                 for (Rows.Row x : slots) if (x != null) shown.add(x);
@@ -862,6 +888,58 @@ public class MainActivity extends Activity implements Catalog.Listener {
         heroPlot = pageHero[2];
         pageView.setVisibility(View.VISIBLE);
         if (folderReturn != null && folderReturn.isAttachedToWindow()) folderReturn.requestFocus();
+        else focusPage();
+    }
+
+    /** a row's full page: its titles in a grid under the highlighted one's hero, the next ones loading on the way down */
+    private void openGrid(Rows.Row r) {
+        List<Model.Item> first = new ArrayList<>();
+        Grid.Pager pager = null;
+        if (r.all instanceof Addons.Row) {
+            Addons.Row ar = (Addons.Row) r.all;
+            first.addAll(ar.items);
+            Addons ad = Addons.get(this);
+            if (ar.pages != null) pager = skip -> ad.more(ar, skip);
+        } else if (r.all instanceof Model.Category) {
+            first.addAll(((Model.Category) r.all).items);
+        }
+        gridReturn = getCurrentFocus();
+        gridHero = new TextView[] {heroTitle, heroMeta, heroPlot};
+        gridBackdrop = backdropUrl;
+        gridUnder = folderView != null ? folderView : pageView;
+        LinearLayout v = new LinearLayout(this);
+        v.setOrientation(LinearLayout.VERTICAL);
+        v.addView(hero(), new LinearLayout.LayoutParams(-1, dp(200)));
+        // one line of title, two of story: the grid starts just below
+        heroTitle.setMaxLines(1);
+        heroPlot.setMaxLines(2);
+        heroTitle.setText(r.title);
+        heroMeta.setText("");
+        heroPlot.setText("");
+        TextView label = Ui.line(this, 15, Color.WHITE, true);
+        label.setPadding(dp(48), 0, dp(48), dp(4));
+        v.addView(label);
+        // the row's title without the count some carry ("Action  ·  412")
+        String name = r.all instanceof Model.Category ? ((Model.Category) r.all).name : r.title;
+        Grid g = new Grid(this, first, pager, rowCallbacks());
+        g.changed = () -> label.setText(name + "  ·  " + g.count() + (g.loading() ? "+" : "") + " titres");
+        g.changed.run();
+        v.addView(g, new LinearLayout.LayoutParams(-1, 0, 1f));
+        if (gridUnder != null) gridUnder.setVisibility(View.INVISIBLE);
+        content.addView(v, new FrameLayout.LayoutParams(-1, -1));
+        gridView = v;
+        g.post(g::focusFirst);
+    }
+
+    private void closeGrid() {
+        content.removeView(gridView);
+        gridView = null;
+        heroTitle = gridHero[0];
+        heroMeta = gridHero[1];
+        heroPlot = gridHero[2];
+        setBackdrop(gridBackdrop);
+        if (gridUnder != null) gridUnder.setVisibility(View.VISIBLE);
+        if (gridReturn != null && gridReturn.isAttachedToWindow()) gridReturn.requestFocus();
         else focusPage();
     }
 
@@ -1011,6 +1089,10 @@ public class MainActivity extends Activity implements Catalog.Listener {
                 return true;
             }
             if (livePage != null && livePage.back()) return true;
+            if (gridView != null) {
+                closeGrid();
+                return true;
+            }
             if (folderView != null) {
                 closeFolder();
                 return true;

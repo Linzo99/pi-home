@@ -75,12 +75,40 @@ final class Addons {
         final String name;
         final int kind;
         final List<Model.Item> items;
+        /** where the catalogue's next titles are asked for (null when it can't be paged) */
+        String pages, genre, type;
 
         Row(String name, int kind, List<Model.Item> items) {
             this.name = name;
             this.kind = kind;
             this.items = items;
         }
+    }
+
+    /** a catalogue's titles after the first [skip], for its full page; empty at its end */
+    List<Model.Item> more(Row r, int skip) throws Exception {
+        List<Model.Item> out = new ArrayList<>();
+        if (r.pages == null) return out;
+        String url = r.pages + "/" + (r.genre == null || r.genre.isEmpty() ? "" : "genre=" + enc(r.genre) + "&") + "skip=" + skip + ".json";
+        JSONArray metas = new JSONObject(cached(url, false)).optJSONArray("metas");
+        for (int k = 0; metas != null && k < metas.length(); k++) {
+            Model.Item it = item(metas.optJSONObject(k), r.type);
+            if (it == null) continue;
+            out.add(it);
+            byKey.putIfAbsent(it.key(), it);
+        }
+        return out;
+    }
+
+    /** where a catalogue that takes "skip" is paged from */
+    private static String pages(Addon a, String type, JSONObject c) {
+        boolean skip = has(c.optJSONArray("extraSupported"), "skip");
+        JSONArray extra = c.optJSONArray("extra");
+        for (int i = 0; extra != null && i < extra.length(); i++) {
+            JSONObject e = extra.optJSONObject(i);
+            if (e != null && "skip".equals(e.optString("name"))) skip = true;
+        }
+        return skip ? a.base + "/catalog/" + type + "/" + enc(c.optString("id")) : null;
     }
 
     static final class Stream {
@@ -242,6 +270,8 @@ final class Addons {
                 String name = rowName(a, c.optString("name", c.optString("id")));
                 List<Row> into = "anime".equals(type) ? an : kind == Model.MOVIE ? mv : sr;
                 Row row = new Row(name, kind, new ArrayList<>());
+                row.pages = pages(a, type, c);
+                row.type = type;
                 into.add(row);
                 jobs.add(pool.submit(() -> {
                     try {
@@ -405,15 +435,21 @@ final class Addons {
         }
         for (Addon a : all) {
             if (a.manifest == null || !addonId.equals(a.manifest.optString("id"))) continue;
-            String name = catalogId;
+            String name = catalogId, pages = null;
             JSONArray cats = a.manifest.optJSONArray("catalogs");
             for (int i = 0; cats != null && i < cats.length(); i++) {
                 JSONObject c = cats.optJSONObject(i);
-                if (c != null && type.equals(c.optString("type")) && catalogId.equals(c.optString("id"))) name = c.optString("name", catalogId);
+                if (c != null && type.equals(c.optString("type")) && catalogId.equals(c.optString("id"))) {
+                    name = c.optString("name", catalogId);
+                    pages = pages(a, type, c);
+                }
             }
             String url = a.base + "/catalog/" + type + "/" + enc(catalogId)
                     + (genre == null || genre.isEmpty() ? "" : "/genre=" + enc(genre)) + ".json";
             Row row = new Row(catalogName(name), kind(type), new ArrayList<>());
+            row.pages = pages;
+            row.genre = genre;
+            row.type = type;
             try {
                 JSONArray metas = new JSONObject(cached(url, false)).optJSONArray("metas");
                 for (int k = 0; metas != null && k < metas.length(); k++) {
