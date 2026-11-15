@@ -81,11 +81,15 @@ final class Folders {
                     d.backdrop = x.optString("heroBackdropUrl", null);
                     d.logo = x.optString("titleLogoUrl", null);
                     d.landscape = "LANDSCAPE".equals(x.optString("tileShape"));
+                    // an app export lists them as "sources", the pack's template as "catalogSources"
                     JSONArray src = x.optJSONArray("sources");
+                    if (src == null) src = x.optJSONArray("catalogSources");
                     for (int s = 0; src != null && s < src.length(); s++) {
                         JSONObject y = src.optJSONObject(s);
                         if (y == null || !"addon".equals(y.optString("provider", "addon"))) continue;
-                        d.sources.add(new String[] {y.optString("addonId"), y.optString("type"), y.optString("catalogId"), y.optString("genre")});
+                        String genre = y.optString("genre");
+                        if ("None".equals(genre)) genre = "";
+                        d.sources.add(new String[] {y.optString("addonId"), y.optString("type"), y.optString("catalogId"), genre});
                     }
                     if (!d.sources.isEmpty()) col.folders.add(d);
                 }
