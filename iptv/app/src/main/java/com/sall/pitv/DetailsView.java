@@ -299,8 +299,8 @@ final class DetailsView {
         if (quickCancel != null) return;
         if (item.kind == Model.MOVIE) {
             Library.Progress p = a.lib.progress(item);
-            long pos = fromStart || p == null || p.finished() ? 0 : p.pos;
-            if (item.fromAddon()) findStream(item, () -> PlayerActivity.play(a, List.of(item), 0, pos), pick);
+            long pos = fromStart || p == null || p.finished() ? 0 : p.pos, asked = System.currentTimeMillis();
+            if (item.fromAddon()) findStream(item, () -> PlayerActivity.play(a, List.of(item), 0, since(item, pos, asked)), pick);
             else PlayerActivity.play(a, List.of(item), 0, pos);
             return;
         }
@@ -341,7 +341,18 @@ final class DetailsView {
         for (Model.Item e : all) e.url = null;
         Model.Item first = all.get(idx);
         int at = idx;
-        findStream(first, () -> PlayerActivity.play(a, all, at, pos), pick);
+        long asked = System.currentTimeMillis();
+        findStream(first, () -> PlayerActivity.play(a, all, at, since(first, pos, asked)), pick);
+    }
+
+    /**
+     * where a link chosen in the list starts: where the title was left if it played since Play was
+     * pressed (another link after Back), else [pos]
+     */
+    private long since(Model.Item i, long pos, long asked) {
+        Library.Progress p = a.lib.progress(i);
+        if (p == null || p.time < asked) return pos;
+        return p.finished() ? 0 : p.pos;
     }
 
     private void findStream(Model.Item target, Runnable play, boolean pick) {
