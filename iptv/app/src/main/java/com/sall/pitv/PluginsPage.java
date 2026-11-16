@@ -187,10 +187,12 @@ final class PluginsPage {
             TextView state = Ui.line(a, 11, Ui.FAINT, false);
             state.setText(ready == ss.size() ? "" : ready + "/" + ss.size() + " prêts");
             head.addView(state, Ui.margins(0, -2, a.dp(12), 0, a.dp(12), 0));
-            head.addView(Ui.button(a, R.drawable.ic_replay, "Actualiser", v -> {
+            TextView again = Ui.button(a, R.drawable.ic_replay, "Actualiser", v -> {
                 state.setText("Mise à jour…");
                 p.refresh(repo);
-            }), Ui.margins(-2, -2, 0, 0, a.dp(8), 0));
+            });
+            again.setTag("refresh:" + repo.url);
+            head.addView(again, Ui.margins(-2, -2, 0, 0, a.dp(8), 0));
             // switching the repository off and removing it, side by side
             TextView onOff = Ui.toggle(a, repo.enabled, repo.name, v -> {
                 p.setEnabled(repo, !repo.enabled);
@@ -198,10 +200,12 @@ final class PluginsPage {
             });
             onOff.setTag("enable:" + repo.url);
             head.addView(onOff, Ui.margins(-2, -2, 0, 0, a.dp(8), 0));
-            head.addView(Ui.button(a, 0, "Retirer", v -> {
+            TextView remove = Ui.button(a, 0, "Retirer", v -> {
                 p.remove(repo);
                 refresh();
-            }));
+            });
+            remove.setTag("remove:" + repo.url);
+            head.addView(remove);
             list.addView(head, Ui.margins(-1, -2, 0, a.dp(14), 0, a.dp(4)));
             if (!expanded || !repo.enabled) continue;
             TextView u = Ui.line(a, 11, Ui.FAINT, false);
@@ -242,10 +246,10 @@ final class PluginsPage {
                 list.addView(row, Ui.margins(-1, -2, 0, 0, 0, a.dp(2)));
             }
         }
-        if (keep != null) {
-            View back = list.findViewWithTag(keep);
-            if (back != null) back.requestFocus();
-        }
+        View back = keep == null ? null : list.findViewWithTag(keep);
+        if (back != null) back.requestFocus();
+        // a view without a tag, or gone: the list's first, never the tabs above
+        else if (list.isFocused()) focus();
         list.setFocusable(false);
     }
 }

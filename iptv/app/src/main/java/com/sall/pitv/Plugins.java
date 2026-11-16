@@ -241,8 +241,24 @@ final class Plugins {
         return set;
     }
 
-    /** re-reads a repository's manifest and its changed scripts */
+    /**
+     * re-reads a repository's manifest and its changed scripts, and gives all of its scripts a
+     * fresh start: the paused ones run again, and recent failures and empty answers are forgotten
+     */
     void refresh(Repo repo) {
+        String prefix = repo.url + "#";
+        synchronized (stats) {
+            stats.keySet().removeIf(k -> k.startsWith(prefix));
+            lastTitle.keySet().removeIf(k -> k.startsWith(prefix));
+        }
+        saveStats();
+        synchronized (errors) {
+            errors.keySet().removeIf(k -> k.startsWith(prefix));
+        }
+        synchronized (results) {
+            results.entrySet().removeIf(e -> e.getKey().startsWith(prefix) && e.getValue().streams.isEmpty());
+        }
+        fire();
         downloads.submit(() -> {
             try {
                 Fetched f = fetch(repo.url);
