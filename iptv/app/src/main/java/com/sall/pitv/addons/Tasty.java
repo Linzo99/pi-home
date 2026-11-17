@@ -41,12 +41,12 @@ public final class Tasty {
 
     /** the catalogues: id, row name, category path */
     private static final String[][] CATALOGS = {
-            {"tasty-new", "Tastyblacks · Récentes", "/en/0/all/"},
-            {"tasty-french", "Tastyblacks · Français", "/en/89/french/"},
-            {"tasty-french-amateur", "Tastyblacks · Amateur français", "/en/136612/french_amateur/"},
-            {"tasty-ebony", "Tastyblacks · Ebony", "/en/13/ebony/"},
+            {"tasty-popular", "Tastyblacks · Populaires", "/en/0/all/"},
+            {"tasty-new", "Tastyblacks · Nouveautés", "/en/0/all/new/"},
+            {"tasty-ebony-bbw", "Tastyblacks · Ebony BBW", "/en/136605/ebony_bbw/"},
+            {"tasty-big-tits", "Tastyblacks · Big Tits", "/en/469/big_tits/"},
+            {"tasty-blowjob", "Tastyblacks · Blowjob", "/en/106/blowjob/"},
             {"tasty-big-ass", "Tastyblacks · Big Ass", "/en/209/big_ass/"},
-            {"tasty-amateur", "Tastyblacks · Amateur", "/en/21/amateur/"},
     };
 
     /** the sites (as Tastyblacks names them) whose page gives the video file; tried in Nov 2026 */

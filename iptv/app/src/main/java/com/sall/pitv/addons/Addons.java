@@ -744,6 +744,8 @@ public final class Addons {
 
     /** the response saved on disk, fetched again when older than a few hours (or forced) */
     private String cached(String url, boolean force) throws Exception {
+        // a built-in add-on's manifest is part of the app: never an old copy after an update
+        if (Builtin.is(url) && url.endsWith("/manifest.json")) return Net.text(url);
         File f = new File(dir, Integer.toHexString(url.hashCode()) + ".json");
         boolean fresh = f.exists() && System.currentTimeMillis() - f.lastModified() < MAX_AGE;
         if (fresh && !force) return new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
