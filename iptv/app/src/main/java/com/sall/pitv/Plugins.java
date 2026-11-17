@@ -557,8 +557,10 @@ final class Plugins {
                 if (o == null) continue;
                 String url = o.optString("url", "");
                 String low = url.toLowerCase(Locale.ROOT);
-                // direct links only, never a torrent or a player page
-                if (!low.startsWith("http") || low.startsWith("http://127.") || low.contains(".torrent")) continue;
+                // direct links only, never a torrent or a player page; a data: link is a playlist the
+                // script put together itself (e.g. a video with another site's Italian audio)
+                boolean data = low.startsWith("data:");
+                if (!data && (!low.startsWith("http") || low.startsWith("http://127.") || low.contains(".torrent"))) continue;
                 Addons.Stream st = new Addons.Stream();
                 st.addon = s.name;
                 st.name = first(o.optString("name", null), o.optString("quality", null));
@@ -610,6 +612,29 @@ final class Plugins {
         if (t.contains("480")) return 2;
         if (t.contains("360")) return 1;
         return 0;
+    }
+
+    private static final java.util.regex.Pattern VOST = java.util.regex.Pattern.compile("\\b(vostfr|vost|subfrench|sub ?fr|st ?fr|sous[- ]titr)"),
+            MULTI = java.util.regex.Pattern.compile("\\b(multi|dual)\\b"),
+            VF = java.util.regex.Pattern.compile("\\b(vff?|vfq|vfi|vf2|truefrench|french|fran[cç]ais|fr)\\b"),
+            VO = java.util.regex.Pattern.compile("\\b(vo|eng|english|anglais)\\b"),
+            ES = java.util.regex.Pattern.compile("\\b(esp|spanish|espa[nñ]ol|castellano|latino)\\b"),
+            IT = java.util.regex.Pattern.compile("\\b(ita|italian|italiano)\\b"),
+            DE = java.util.regex.Pattern.compile("\\b(ger|german|deutsch)\\b");
+
+    /** the language a link's text shows, from its tags or flag emoji; "" when it doesn't say */
+    static String language(String s) {
+        String t = s == null ? "" : s.toLowerCase(Locale.ROOT).replace('_', ' ').replace('.', ' ');
+        if (VOST.matcher(t).find()) return "VOSTFR";
+        boolean fr = VF.matcher(t).find() || t.contains("\uD83C\uDDEB\uD83C\uDDF7");
+        boolean en = VO.matcher(t).find() || t.contains("\uD83C\uDDEC\uD83C\uDDE7") || t.contains("\uD83C\uDDFA\uD83C\uDDF8");
+        if (MULTI.matcher(t).find() || (fr && en)) return "MULTI";
+        if (fr) return "VF";
+        if (en) return "VO";
+        if (ES.matcher(t).find() || t.contains("\uD83C\uDDEA\uD83C\uDDF8") || t.contains("\uD83C\uDDF2\uD83C\uDDFD")) return "Espagnol";
+        if (IT.matcher(t).find() || t.contains("\uD83C\uDDEE\uD83C\uDDF9")) return "Italien";
+        if (DE.matcher(t).find() || t.contains("\uD83C\uDDE9\uD83C\uDDEA")) return "Allemand";
+        return "";
     }
 
     private static boolean supports(Scraper s, String type) {

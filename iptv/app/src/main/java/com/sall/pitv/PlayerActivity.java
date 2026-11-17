@@ -245,7 +245,7 @@ public class PlayerActivity extends Activity {
                 return Math.min(4_000, info.errorCount * 1_000L);
             }
         };
-        DefaultMediaSourceFactory sources = new DefaultMediaSourceFactory(http, extractors).setLoadErrorHandlingPolicy(retry);
+        DefaultMediaSourceFactory sources = new DefaultMediaSourceFactory(new androidx.media3.datasource.DefaultDataSource.Factory(this, http), extractors).setLoadErrorHandlingPolicy(retry);
         direct = sources;
         java.net.InetSocketAddress pa = cat.source.proxyAddress();
         if (pa != null) {
@@ -257,7 +257,7 @@ public class PlayerActivity extends Activity {
                     .followSslRedirects(true)
                     .build();
             okhttp = new androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(client).setUserAgent(Net.agent);
-            proxied = new DefaultMediaSourceFactory(okhttp, extractors)
+            proxied = new DefaultMediaSourceFactory(new androidx.media3.datasource.DefaultDataSource.Factory(this, okhttp), extractors)
                     .setLoadErrorHandlingPolicy(retry);
         }
         DefaultRenderersFactory renderers = new DefaultRenderersFactory(this)
@@ -655,7 +655,7 @@ public class PlayerActivity extends Activity {
                 fail("Aucune source pour cet épisode");
                 return;
             }
-            Addons.Stream s = streams.get(0);
+            Addons.Stream s = inPreferredLanguage(this, streams).get(0);
             for (Addons.Stream x : streams) if (binge != null && binge.equals(x.bingeGroup)) {
                 s = x;
                 break;
@@ -1095,6 +1095,21 @@ public class PlayerActivity extends Activity {
             }
         }
         if (type == C.TRACK_TYPE_TEXT && selected < 0) selected = 0;
+        // the language can also change by taking another of the title's links
+        if (type == C.TRACK_TYPE_AUDIO && canFallBack()) {
+            String cur = "";
+            java.util.Map<String, Integer> other = new java.util.LinkedHashMap<>();
+            for (Addons.Stream x : new ArrayList<>(item.alternatives)) if (x.url != null && x.url.equals(item.url)) cur = x.language();
+            for (Addons.Stream x : new ArrayList<>(item.alternatives)) {
+                if (x.url == null || x.url.isEmpty() || x.url.equals(item.url) || x.language().isEmpty()) continue;
+                other.merge(x.language(), 1, Integer::sum);
+            }
+            other.remove(cur);
+            for (java.util.Map.Entry<String, Integer> e : other.entrySet()) {
+                labels.add("Autre lien en " + e.getKey() + "  (" + e.getValue() + (e.getValue() > 1 ? " liens)" : " lien)"));
+                actions.add(() -> switchLanguage(e.getKey()));
+            }
+        }
         new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle(type == C.TRACK_TYPE_AUDIO ? "Audio" : "Sous-titres")
                 .setSingleChoiceItems(labels.toArray(new String[0]), selected, (d, which) -> {
@@ -1102,6 +1117,41 @@ public class PlayerActivity extends Activity {
                     d.dismiss();
                 })
                 .show();
+    }
+
+    /** plays the best of the title's links in [lang] from where it is, and prefers that language from now on */
+    private void switchLanguage(String lang) {
+        getSharedPreferences("player", MODE_PRIVATE).edit().putString("srcLang", lang).apply();
+        List<Addons.Stream> links = new ArrayList<>();
+        for (Addons.Stream x : new ArrayList<>(item.alternatives)) if (x.url != null && !x.url.equals(item.url) && lang.equals(x.language())) links.add(x);
+        Addons.Stream pick = bestFor(this, links);
+        if (pick == null) return;
+        ui.removeCallbacks(startTimeout);
+        ui.removeCallbacks(stallTimeout);
+        long pos = Math.max(0, player.getCurrentPosition());
+        item.url = pick.url;
+        item.headers = pick.headers;
+        item.bingeGroup = pick.bingeGroup;
+        item.source = pick.source();
+        String q = qualityName(pick.quality());
+        message.setText("Passage en " + lang + " — " + pick.addon + (q.isEmpty() ? "" : " en " + q) + "…");
+        message.setVisibility(View.VISIBLE);
+        spinner.setVisibility(View.VISIBLE);
+        retries = 0;
+        playedOnRoute = false;
+        bare = false;
+        stalls.clear();
+        resumeAt = pos;
+        start(pos);
+    }
+
+    /** the links in the language last chosen with Audio, or all of them if none is in it */
+    static List<Addons.Stream> inPreferredLanguage(Context c, List<Addons.Stream> links) {
+        String lang = c.getSharedPreferences("player", MODE_PRIVATE).getString("srcLang", null);
+        if (lang == null) return links;
+        List<Addons.Stream> out = new ArrayList<>();
+        for (Addons.Stream x : links) if (lang.equals(x.language())) out.add(x);
+        return out.isEmpty() ? links : out;
     }
 
     private static String trackName(Format f, int n) {
