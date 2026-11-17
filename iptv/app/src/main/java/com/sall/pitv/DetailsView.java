@@ -397,7 +397,7 @@ final class DetailsView {
                 for (Addons.Stream x : found) if (provider.equals(x.addon)) (latest.equals(x.source()) ? exact : same).add(x);
                 pick = PlayerActivity.bestFor(a, exact.isEmpty() ? same : exact);
             }
-            if (pick == null && (System.currentTimeMillis() - t0 >= 5_000 || pending[0] == 0)) pick = PlayerActivity.bestFor(a, found);
+            if (pick == null && (System.currentTimeMillis() - t0 >= 5_000 || pending[0] == 0)) pick = PlayerActivity.bestFor(a, PlayerActivity.inPreferredLanguage(a, found));
             if (pick == null) {
                 if (pending[0] == 0) {
                     stop.run();

@@ -25,6 +25,15 @@ In the player:
 | Play / Pause | Pauses the channel, then resumes it where it was | Pause / play |
 | Back | Hides the controls, then leaves | Same; the position is saved |
 
+Audio lists the tracks of the link playing (a MULTI file has several), then the title's other
+links by the language their names show (« Autre lien en VOSTFR (3 liens) »). Choosing one switches
+to the best of them at the same position, and that language is preferred for later titles and
+episodes.
+
+On the Sources page, « Trier » (up from the list) orders the links by quality, by language (the
+one chosen in the player first, then VF, MULTI, VOSTFR, VO) or by source, best quality first in
+each group; the order is kept for next time. Each link shows its language and quality at the right.
+
 On Pi Home, highlighting Pi TV shows its row: the films and episodes of Continuer à regarder,
 then the recent channels. Choosing one opens Pi TV on it: a film's page, ready to resume, or the
 channel playing. The app publishes them to the Android TV provider each time it comes back to the

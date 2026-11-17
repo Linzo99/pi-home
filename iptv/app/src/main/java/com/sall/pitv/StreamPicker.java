@@ -64,6 +64,10 @@ final class StreamPicker {
     /** the source that played this title last time: taken the moment it answers, unless a key comes first */
     private String resume;
     private final android.widget.ImageView backdrop;
+    /** how the links are ordered: by quality, by language, or by source; kept for next time */
+    private static final String[] SORTS = {"Qualité", "Langue", "Source"};
+    private int sort;
+    private final TextView sortButton;
 
     StreamPicker(MainActivity a, String title, Pick pick) {
         this.a = a;
@@ -94,9 +98,20 @@ final class StreamPicker {
         col.setPadding(a.dp(48), a.dp(32), a.dp(48), a.dp(24));
         root.addView(col, new FrameLayout.LayoutParams(-1, -1));
 
+        LinearLayout top = new LinearLayout(a);
+        top.setGravity(Gravity.CENTER_VERTICAL);
         TextView h = Ui.line(a, 24, Color.WHITE, true);
         h.setText(title);
-        col.addView(h);
+        top.addView(h, new LinearLayout.LayoutParams(0, -2, 1f));
+        sort = Math.max(0, Math.min(SORTS.length - 1, a.getSharedPreferences("player", android.content.Context.MODE_PRIVATE).getInt("pickSort", 0)));
+        sortButton = Ui.button(a, 0, "Trier : " + SORTS[sort], v -> {
+            sort = (sort + 1) % SORTS.length;
+            a.getSharedPreferences("player", android.content.Context.MODE_PRIVATE).edit().putInt("pickSort", sort).apply();
+            ((TextView) v).setText("Trier : " + SORTS[sort]);
+            showLinks();
+        });
+        top.addView(sortButton);
+        col.addView(top);
         LinearLayout sl = new LinearLayout(a);
         sl.setGravity(Gravity.CENTER_VERTICAL);
         spinner = new ProgressBar(a);
@@ -118,7 +133,7 @@ final class StreamPicker {
         cols.addView(scroll(linkList), lp);
 
         TextView hint = Ui.line(a, 11, Ui.FAINT, false);
-        hint.setText("Haut / bas : choisir une source   ·   Droite : ses liens   ·   OK : lire (Retour y revient)   ·   Retour : fermer");
+        hint.setText("Haut : trier   ·   Haut / bas : choisir une source   ·   Droite : ses liens   ·   OK : lire (Retour y revient)   ·   Retour : fermer");
         col.addView(hint, Ui.margins(-1, -2, 0, a.dp(12), 0, 0));
 
         dialog.setContentView(root);
@@ -354,7 +369,21 @@ final class StreamPicker {
 
     private List<Addons.Stream> shownStreams() {
         Source s = sources.get(selected);
-        return selected.equals(ALL) || s == null ? all : s.streams;
+        List<Addons.Stream> l = new ArrayList<>(selected.equals(ALL) || s == null ? all : s.streams);
+        // the lists are already best quality first: the other orders keep it within their groups
+        if (sort == 1) l.sort(Comparator.comparingInt(this::languageRank));
+        else if (sort == 2) l.sort(Comparator.comparing((Addons.Stream x) -> x.addon == null ? "" : x.addon.toLowerCase(java.util.Locale.ROOT)));
+        return l;
+    }
+
+    /** the language chosen last in the player first, then French, then the rest; unknown last */
+    private int languageRank(Addons.Stream x) {
+        String l = x.language();
+        if (l.isEmpty()) return 99;
+        String pref = a.getSharedPreferences("player", android.content.Context.MODE_PRIVATE).getString("srcLang", null);
+        if (l.equals(pref)) return 0;
+        int i = java.util.Arrays.asList("VF", "MULTI", "VOSTFR", "VO", "Espagnol", "Italien", "Allemand").indexOf(l);
+        return i < 0 ? 50 : i + 1;
     }
 
     private void showLinks() {
@@ -367,7 +396,10 @@ final class StreamPicker {
         List<Addons.Stream> l = shownStreams();
         // the placeholder line goes once links come
         if (linkList.getChildCount() == 1 && !linkList.getChildAt(0).isFocusable()) linkList.removeAllViews();
-        for (int i = linkList.getChildCount(); i < l.size(); i++) linkList.addView(linkRow(l.get(i)), Ui.margins(-1, -2, 0, 0, 0, a.dp(4)));
+        // those that came in the middle of the order are added at the end, until the list is redrawn
+        java.util.Set<Object> shown = new java.util.HashSet<>();
+        for (int i = 0; i < linkList.getChildCount(); i++) shown.add(linkList.getChildAt(i).getTag());
+        for (Addons.Stream x : l) if (!shown.contains(x)) linkList.addView(linkRow(x), Ui.margins(-1, -2, 0, 0, 0, a.dp(4)));
         if (linkList.getChildCount() == 0) {
             Source s = sources.get(selected);
             TextView none = Ui.text(a, 13, Ui.DIM, false);
@@ -384,10 +416,20 @@ final class StreamPicker {
         row.setFocusable(true);
         row.setTag(s);
         row.setBackground(Ui.glass(a, a.dp(14), 0));
+        LinearLayout line = new LinearLayout(a);
+        line.setGravity(Gravity.CENTER_VERTICAL);
         TextView name = Ui.line(a, 14, Color.WHITE, true);
         String n = s.name == null ? "" : s.name.replace('\n', ' ').trim();
         name.setText((selected.equals(ALL) ? s.addon + (n.isEmpty() || n.equals(s.addon) ? "" : "  ·  " + n) : n.isEmpty() ? s.addon : n));
-        row.addView(name);
+        line.addView(name, new LinearLayout.LayoutParams(0, -2, 1f));
+        // its language and quality at a glance, as the sorting sees them
+        String q = new String[] {"", "360p", "480p", "720p", "1080p", "4K"}[s.quality()];
+        String tags = s.language() + (s.language().isEmpty() || q.isEmpty() ? "" : "  ·  ") + q;
+        TextView badge = Ui.line(a, 12, Color.WHITE, true);
+        badge.setText(tags);
+        badge.setVisibility(tags.isEmpty() ? View.GONE : View.VISIBLE);
+        line.addView(badge, Ui.margins(-2, -2, a.dp(12), 0, 0, 0));
+        row.addView(line);
         String t = s.title == null ? "" : s.title.replace("\n", "  ·  ").trim();
         TextView detail = Ui.text(a, 12, Ui.DIM, false);
         detail.setMaxLines(2);
@@ -397,6 +439,7 @@ final class StreamPicker {
         row.setOnFocusChangeListener((v, has) -> {
             row.setBackground(has ? Ui.rounded(Color.WHITE, a.dp(14)) : Ui.glass(a, a.dp(14), 0));
             name.setTextColor(has ? Color.BLACK : Color.WHITE);
+            badge.setTextColor(has ? Color.BLACK : Color.WHITE);
             detail.setTextColor(has ? 0xB3000000 : Ui.DIM);
         });
         // the window stays under the player: Back from it comes back to these links

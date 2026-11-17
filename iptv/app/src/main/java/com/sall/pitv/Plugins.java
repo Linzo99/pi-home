@@ -601,16 +601,21 @@ final class Plugins {
         return a == null || a.isEmpty() ? (b == null ? "" : b) : a;
     }
 
+    private static final java.util.regex.Pattern FOUR_K = java.util.regex.Pattern.compile("\\b(4k|uhd)\\b");
+
     static int quality(String s) {
         String t = s == null ? "" : s.toLowerCase(Locale.ROOT);
-        if (t.contains("2160") || t.contains("4k")) return 5;
+        // the resolution written out wins over a "4K" that may be part of a site's name (4KHDHub)
+        if (t.contains("2160")) return 5;
         if (t.contains("1080")) return 4;
         if (t.contains("720")) return 3;
         if (t.contains("480")) return 2;
         if (t.contains("360")) return 1;
+        if (FOUR_K.matcher(t).find()) return 5;
         return 0;
     }
 
+    private static final java.util.regex.Pattern SUBS = java.util.regex.Pattern.compile("\\b(subtitles?|subs?|sous-titres|st)\\s*:[^·•|\\n]*");
     private static final java.util.regex.Pattern VOST = java.util.regex.Pattern.compile("\\b(vostfr|vost|subfrench|sub ?fr|st ?fr|sous[- ]titr)"),
             MULTI = java.util.regex.Pattern.compile("\\b(multi|dual)\\b"),
             VF = java.util.regex.Pattern.compile("\\b(vff?|vfq|vfi|vf2|truefrench|french|fran[cç]ais|fr)\\b"),
@@ -621,7 +626,9 @@ final class Plugins {
 
     /** the language a link's text shows, from its tags or flag emoji; "" when it doesn't say */
     static String language(String s) {
-        String t = s == null ? "" : s.toLowerCase(Locale.ROOT).replace('_', ' ').replace('.', ' ');
+        String t = s == null ? "" : s.toLowerCase(Locale.ROOT);
+        // a list of subtitles says nothing of the audio ("Subtitles: English, French, …")
+        t = SUBS.matcher(t).replaceAll(" ").replace('_', ' ').replace('.', ' ');
         if (VOST.matcher(t).find()) return "VOSTFR";
         boolean fr = VF.matcher(t).find() || t.contains("\uD83C\uDDEB\uD83C\uDDF7");
         boolean en = VO.matcher(t).find() || t.contains("\uD83C\uDDEC\uD83C\uDDE7") || t.contains("\uD83C\uDDFA\uD83C\uDDF8");
