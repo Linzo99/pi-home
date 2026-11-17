@@ -958,6 +958,9 @@ public class MainActivity extends Activity implements Catalog.Listener {
 
     // ---------------------------------------------------------------- search
 
+    /** the add-ons are asked once the typing has paused this long (ms), for this many letters */
+    private static final int ADDON_SEARCH_PAUSE = 800, ADDON_SEARCH_MIN = 3;
+
     private View searchPage() {
         LinearLayout v = new LinearLayout(this);
         v.setOrientation(LinearLayout.VERTICAL);
@@ -984,16 +987,24 @@ public class MainActivity extends Activity implements Catalog.Listener {
         v.addView(hint);
         Rows rows = new Rows(this, rowCallbacks());
         v.addView(rows, new LinearLayout.LayoutParams(-1, 0, 1f));
-        Runnable run = () -> {
+        // the provider's list is searched here, at once; the add-ons are asked over the network,
+        // so only once the typing has paused and the words are long enough to mean something
+        Runnable local = () -> {
             String s = q.getText().toString();
             List<Rows.Row> r = new ArrayList<>();
             r.add(new Rows.Row("Chaînes", Rows.CHANNEL, cat.search(s, Model.LIVE, 60)));
             r.add(new Rows.Row("Films", Rows.POSTER, cat.search(s, Model.MOVIE, 60)));
             r.add(new Rows.Row("Séries", Rows.POSTER, cat.search(s, Model.SERIES, 60)));
             rows.setRows(r);
-            hint.setText(s.trim().isEmpty() ? "Tapez quelques lettres, puis descendez vers les résultats."
-                    : rows.isEmpty() ? "Recherche dans les add-ons…" : "");
-            if (s.trim().length() < 2) return;
+            String t = s.trim();
+            hint.setText(t.isEmpty() ? "Tapez quelques lettres, puis descendez vers les résultats."
+                    : !rows.isEmpty() ? ""
+                    : t.length() < ADDON_SEARCH_MIN ? "Encore une lettre ou deux pour chercher dans les add-ons…"
+                    : "Recherche dans les add-ons…");
+        };
+        Runnable remote = () -> {
+            String s = q.getText().toString();
+            if (s.trim().length() < ADDON_SEARCH_MIN) return;
             // the add-ons search on their side, all at once: each one's row comes as it answers
             Addons.get(this).search(s.trim(), new Addons.Searching() {
                 @Override
@@ -1014,6 +1025,12 @@ public class MainActivity extends Activity implements Catalog.Listener {
                 }
             });
         };
+        Runnable run = () -> {
+            ui.removeCallbacks(local);
+            ui.removeCallbacks(remote);
+            local.run();
+            remote.run();
+        };
         q.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int a, int b, int c) {
@@ -1025,8 +1042,10 @@ public class MainActivity extends Activity implements Catalog.Listener {
 
             @Override
             public void afterTextChanged(Editable s) {
-                ui.removeCallbacks(run);
-                ui.postDelayed(run, 300);
+                ui.removeCallbacks(local);
+                ui.removeCallbacks(remote);
+                ui.postDelayed(local, 150);
+                ui.postDelayed(remote, ADDON_SEARCH_PAUSE);
             }
         });
         q.setOnKeyListener((x, key, e) -> {
