@@ -162,6 +162,22 @@ final class AddonsPage {
             onOff.setTag("enable:" + u);
             row.addView(onOff, Ui.margins(-2, -2, a.dp(12), 0, 0, 0));
 
+            // 18+: on the Adulte page only, behind the code; a manifest that says so can't be undone
+            boolean byManifest = x != null && x.manifest != null && x.manifest.optJSONObject("behaviorHints") != null
+                    && x.manifest.optJSONObject("behaviorHints").optBoolean("adult");
+            boolean adult = byManifest || ad.marked().contains(u);
+            TextView eighteen = Ui.button(a, 0, adult ? "✓ 18+" : "18+", v -> {
+                if (byManifest) {
+                    Toast.makeText(a, "Cet add-on se déclare adulte lui-même", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                ad.setMarked(u, !adult);
+                a.cat.loadAddons(false);
+                refresh();
+            });
+            eighteen.setTag("adult:" + u);
+            row.addView(eighteen, Ui.margins(-2, -2, a.dp(8), 0, 0, 0));
+
             TextView remove = Ui.button(a, 0, "Retirer", v -> {
                 List<String> l = ad.urls();
                 l.remove(u);

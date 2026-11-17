@@ -49,6 +49,15 @@ final class Addons {
             base = url.replaceFirst("/manifest\\.json.*$", "");
         }
 
+        /** switched to 18+ on the add-ons page */
+        boolean marked;
+
+        /** an adult add-on: its manifest says so, or it was switched to 18+ */
+        boolean adult() {
+            JSONObject h = manifest == null ? null : manifest.optJSONObject("behaviorHints");
+            return marked || h != null && h.optBoolean("adult");
+        }
+
         /** whether it answers [resource] for this type and id */
         boolean serves(String resource, String type, String id) {
             if (manifest == null) return false;
@@ -75,6 +84,8 @@ final class Addons {
         final String name;
         final int kind;
         final List<Model.Item> items;
+        /** from an adult add-on: on the Adulte page only, once the code is typed */
+        boolean adult;
         /** where the catalogue's next titles are asked for (null when it can't be paged) */
         String pages, genre, type;
 
@@ -94,6 +105,7 @@ final class Addons {
         for (int k = 0; metas != null && k < metas.length(); k++) {
             Model.Item it = item(metas.optJSONObject(k), r.type);
             if (it == null) continue;
+            it.adult = r.adult;
             out.add(it);
             byKey.putIfAbsent(it.key(), it);
         }
@@ -163,7 +175,12 @@ final class Addons {
         app = c;
         dir = new File(c.getFilesDir(), "addons");
         dir.mkdirs();
-        for (String u : urls()) list.add(new Addon(u));
+        java.util.Set<String> m = marked();
+        for (String u : urls()) {
+            Addon a = new Addon(u);
+            a.marked = m.contains(u);
+            list.add(a);
+        }
     }
 
     private SharedPreferences prefs() {
@@ -196,7 +213,12 @@ final class Addons {
         prefs().edit().putString("urls", a.toString()).apply();
         synchronized (list) {
             list.clear();
-            for (String u : seen) list.add(new Addon(u));
+            java.util.Set<String> m = marked();
+            for (String u : seen) {
+                Addon x = new Addon(u);
+                x.marked = m.contains(u);
+                list.add(x);
+            }
         }
     }
 
@@ -210,6 +232,27 @@ final class Addons {
         if (on) o.remove(url);
         else o.add(url);
         prefs().edit().putString("off", new JSONArray(o).toString()).apply();
+    }
+
+    /** an add-on switched to 18+ by hand (one whose manifest doesn't say it is) */
+    void setMarked(String url, boolean on) {
+        java.util.Set<String> m = marked();
+        if (on) m.add(url);
+        else m.remove(url);
+        prefs().edit().putString("adult", new JSONArray(m).toString()).apply();
+        synchronized (list) {
+            for (Addon a : list) if (a.url.equals(url)) a.marked = on;
+        }
+    }
+
+    java.util.Set<String> marked() {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        try {
+            JSONArray a = new JSONArray(prefs().getString("adult", "[]"));
+            for (int i = 0; i < a.length(); i++) out.add(a.getString(i));
+        } catch (Exception ignored) {
+        }
+        return out;
     }
 
     private java.util.Set<String> off() {
@@ -237,7 +280,7 @@ final class Addons {
         java.util.Set<String> o = off();
         List<Addon> out = new ArrayList<>();
         synchronized (list) {
-            for (Addon a : list) if (!o.contains(a.url)) out.add(a);
+            for (Addon a : list) if (!o.contains(a.url) && (Adult.unlocked || !a.adult())) out.add(a);
         }
         return out;
     }
@@ -278,13 +321,16 @@ final class Addons {
                 Row row = new Row(name, kind, new ArrayList<>());
                 row.pages = pages(a, type, c);
                 row.type = type;
+                row.adult = a.adult();
                 into.add(row);
                 jobs.add(pool.submit(() -> {
                     try {
                         JSONArray metas = new JSONObject(cached(url, force)).optJSONArray("metas");
                         for (int k = 0; metas != null && k < metas.length(); k++) {
                             Model.Item it = item(metas.optJSONObject(k), type);
-                            if (it != null) row.items.add(it);
+                            if (it == null) continue;
+                            it.adult = row.adult;
+                            row.items.add(it);
                         }
                     } catch (Exception e) {
                         Log.w("PiTV", "catalog " + url, e);
@@ -430,7 +476,9 @@ final class Addons {
                         JSONArray metas = new JSONObject(Net.text(ask[1])).optJSONArray("metas");
                         for (int k = 0; metas != null && k < metas.length(); k++) {
                             Model.Item it = item(metas.optJSONObject(k), ask[0]);
-                            if (it != null) l.add(it);
+                            if (it == null) continue;
+                            it.adult = a.adult();
+                            l.add(it);
                         }
                     } catch (Exception e) {
                         Log.w("PiTV", "addon search " + a.name + ": " + e);
@@ -499,11 +547,13 @@ final class Addons {
             row.pages = pages;
             row.genre = genre;
             row.type = type;
+            row.adult = a.adult();
             try {
                 JSONArray metas = new JSONObject(cached(url, false)).optJSONArray("metas");
                 for (int k = 0; metas != null && k < metas.length(); k++) {
                     Model.Item it = item(metas.optJSONObject(k), type);
                     if (it == null) continue;
+                    it.adult = row.adult;
                     row.items.add(it);
                     byKey.putIfAbsent(it.key(), it);
                 }

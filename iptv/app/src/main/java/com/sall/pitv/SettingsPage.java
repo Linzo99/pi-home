@@ -131,6 +131,7 @@ final class SettingsPage {
         incog[0] = Ui.button(a, 0, incognitoLabel(), v -> {
             Library.setIncognito(a, !Library.incognito);
             incog[0].setText(incognitoLabel());
+            a.updateBadges();
             Toast.makeText(a, Library.incognito ? "Mode privé activé" : "Mode privé désactivé", Toast.LENGTH_SHORT).show();
         });
         incog[0].setId(View.generateViewId());
@@ -156,6 +157,12 @@ final class SettingsPage {
         });
         buttons.addView(clear[0], Ui.margins(-2, -2, a.dp(10), 0, 0, 0));
         box.addView(buttons);
+        TextView adult = Ui.text(a, 13, Ui.DIM, false);
+        adult.setLineSpacing(a.dp(3), 1f);
+        adult.setText("Les add-ons adultes (marqués « 18+ ») ne s'affichent que dans « Adulte », après un code à 4 chiffres, et ne laissent rien dans l'historique.");
+        box.addView(adult, Ui.margins(-1, -2, 0, a.dp(18), 0, a.dp(12)));
+        TextView code = Ui.button(a, 0, Adult.hasCode(a) ? "Changer le code adulte" : "Choisir le code adulte", v -> Adult.change(a));
+        box.addView(code, Ui.margins(-2, -2, 0, 0, 0, 0));
         return box;
     }
 

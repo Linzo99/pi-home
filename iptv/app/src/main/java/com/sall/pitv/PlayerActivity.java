@@ -199,12 +199,14 @@ public class PlayerActivity extends Activity {
         if (player != null) player.pause();
         // the launcher's row, when Home is pressed during playback
         TvHome.sync(this);
+        Adult.stopped();
         super.onStop();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
+        Adult.started();
         if (player != null && item != null && stopped) {
             // back from standby: a live stream must start again from now
             if (live) start(0);
@@ -605,7 +607,7 @@ public class PlayerActivity extends Activity {
     }
 
     private static void saveSource(Context c, Model.Item i) {
-        if (Library.incognito) return;
+        if (Library.incognito || i.adult) return;
         c.getSharedPreferences("player", MODE_PRIVATE).edit().putString(sourceKey(i), i.source).putString("src.latest", i.source).apply();
     }
 

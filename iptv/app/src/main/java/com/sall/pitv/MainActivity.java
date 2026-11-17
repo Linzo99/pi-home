@@ -32,10 +32,10 @@ public class MainActivity extends Activity implements Catalog.Listener {
     static final String EXTRA_OPEN = "pitv.open";
     /** words typed in Pi Home's search: Pi TV opens on its Search page with them */
     static final String EXTRA_SEARCH = "pitv.search";
-    static final int HOME = 0, LIVE = 1, MOVIES = 2, SERIES = 3, ANIME = 4, COLLECTIONS = 5, FAVS = 6, SEARCH = 7, SETTINGS = 8;
-    private static final String[] NAMES = {"Accueil", "TV en direct", "Films", "Séries", "Animes", "Collections", "Ma liste", "Recherche", "Paramètres"};
+    static final int HOME = 0, LIVE = 1, MOVIES = 2, SERIES = 3, ANIME = 4, COLLECTIONS = 5, FAVS = 6, SEARCH = 7, SETTINGS = 8, ADULT = 9;
+    private static final String[] NAMES = {"Accueil", "TV en direct", "Films", "Séries", "Animes", "Collections", "Ma liste", "Recherche", "Paramètres", "Adulte"};
     private static final int[] ICONS = {R.drawable.ic_home, R.drawable.ic_live, R.drawable.ic_movie, R.drawable.ic_series, R.drawable.ic_anime,
-            R.drawable.ic_collections, R.drawable.ic_fav, R.drawable.ic_search, R.drawable.ic_settings};
+            R.drawable.ic_collections, R.drawable.ic_fav, R.drawable.ic_search, R.drawable.ic_settings, R.drawable.ic_lock};
     /** Paramètres' tabs: the IPTV provider, the Stremio add-ons, or the plugins */
     private static final int TAB_IPTV = 0, TAB_ADDONS = 1, TAB_PLUGINS = 2;
     private AddonsPage addonsPage;
@@ -50,7 +50,7 @@ public class MainActivity extends Activity implements Catalog.Listener {
     private ImageView backdrop;
     private View backdropShade;
     /** the menu's pages: Films, Séries and Animes are tabs of Collections */
-    private static final int[] NAV = {HOME, LIVE, COLLECTIONS, FAVS, SEARCH, SETTINGS};
+    private static final int[] NAV = {HOME, LIVE, COLLECTIONS, FAVS, SEARCH, ADULT, SETTINGS};
     private LinearLayout rail;
     private final List<TextView> railItems = new ArrayList<>();
     private TextView statusLine;
@@ -131,6 +131,7 @@ public class MainActivity extends Activity implements Catalog.Listener {
     protected void onResume() {
         super.onResume();
         lib = Library.get(this);
+        updateBadges();
         // positions changed while playing
         if (pageRefresh != null && details == null) pageRefresh.run();
         if (details != null) details.refresh();
@@ -138,6 +139,23 @@ public class MainActivity extends Activity implements Catalog.Listener {
         if (pluginsPage != null) pluginsPage.resume();
         if (livePage != null) livePage.resumePreview();
         TvHome.sync(this);
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        Adult.started();
+    }
+
+    @Override
+    protected void onStop() {
+        Adult.stopped();
+        super.onStop();
+        // shut again while away: the next time Pi TV comes up, the Adulte page isn't left open
+        ui.postDelayed(() -> {
+            if (!Adult.unlocked && page == ADULT) show(HOME, false);
+            updateBadges();
+        }, 3_500);
     }
 
     @Override
@@ -194,6 +212,19 @@ public class MainActivity extends Activity implements Catalog.Listener {
         root.addView(rail, new FrameLayout.LayoutParams(dp(64), -1));
         expandRail(false);
 
+        // at the menu's foot: private mode on, adult add-ons open
+        LinearLayout badges = new LinearLayout(this);
+        badges.setOrientation(LinearLayout.VERTICAL);
+        badges.setGravity(Gravity.CENTER_HORIZONTAL);
+        incognitoBadge = badge(R.drawable.ic_incognito, 0xCCFFFFFF);
+        adultBadge = badge(R.drawable.ic_lock_open, Ui.RED);
+        badges.addView(incognitoBadge, Ui.margins(dp(22), dp(22), 0, dp(6), 0, 0));
+        badges.addView(adultBadge, Ui.margins(dp(22), dp(22), 0, dp(6), 0, 0));
+        FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(dp(64), -2, Gravity.BOTTOM | Gravity.START);
+        bp.bottomMargin = dp(18);
+        root.addView(badges, bp);
+        updateBadges();
+
         statusLine = Ui.line(this, 11, Ui.DIM, false);
         statusLine.setBackground(Ui.rounded(0xCC1F1F1F, dp(12)));
         statusLine.setPadding(dp(12), dp(6), dp(12), dp(6));
@@ -202,6 +233,23 @@ public class MainActivity extends Activity implements Catalog.Listener {
         sp.setMargins(0, 0, dp(20), dp(16));
         root.addView(statusLine, sp);
         return root;
+    }
+
+    private ImageView incognitoBadge, adultBadge;
+
+    private ImageView badge(int icon, int tint) {
+        ImageView v = new ImageView(this);
+        v.setImageResource(icon);
+        v.setImageTintList(ColorStateList.valueOf(tint));
+        v.setFocusable(false);
+        return v;
+    }
+
+    /** shows, at the menu's foot, whether private mode is on and the adult add-ons are open */
+    void updateBadges() {
+        if (incognitoBadge == null) return;
+        incognitoBadge.setVisibility(Library.incognito ? View.VISIBLE : View.GONE);
+        adultBadge.setVisibility(Adult.unlocked ? View.VISIBLE : View.GONE);
     }
 
     private TextView railItem(int i) {
@@ -332,6 +380,14 @@ public class MainActivity extends Activity implements Catalog.Listener {
 
     void show(int which, boolean focus) {
         if (which == page && pageView != null) return;
+        // the adult add-ons: only after their code
+        if (which == ADULT && !Adult.unlocked) {
+            Adult.open(this, () -> {
+                updateBadges();
+                show(ADULT, true);
+            });
+            return;
+        }
         page = which;
         content.removeAllViews();
         heroTitle = null;
@@ -562,6 +618,7 @@ public class MainActivity extends Activity implements Catalog.Listener {
                     : which == FAVS ? "Appuyez sur Pause sur une affiche ou une chaîne pour l'ajouter à votre liste."
                     : which == ANIME || which == COLLECTIONS && collTab == 3 ? "Aucun add-on d'animes : ajoutez-en un dans Paramètres."
                     : which == COLLECTIONS && collTab == 0 ? "Aucune collection : importez un export de collections Nuvio depuis le téléphone (Paramètres)."
+                    : which == ADULT ? "Aucun add-on adulte : marquez-en un « 18+ » dans Paramètres › Add-ons, ou tapez « erome » ou « tastyblacks » pour ajouter les intégrés."
                     : "Rien à afficher pour l'instant.");
             if (rows.isEmpty()) {
                 heroTitle.setText(which == COLLECTIONS ? COLL_TABS[collTab] : NAMES[which]);
@@ -573,21 +630,35 @@ public class MainActivity extends Activity implements Catalog.Listener {
         return v;
     }
 
+    /** an add-on's rows, without the adult ones (on the Adulte page only) */
+    private static List<Addons.Row> notAdult(List<Addons.Row> rows) {
+        List<Addons.Row> out = new ArrayList<>();
+        for (Addons.Row r : rows) if (!r.adult) out.add(r);
+        return out;
+    }
+
+    private static List<Model.Item> notAdultItems(java.util.Collection<Model.Item> items) {
+        List<Model.Item> out = new ArrayList<>();
+        for (Model.Item i : items) if (!i.adult) out.add(i);
+        return out;
+    }
+
     private List<Rows.Row> rowsFor(int which) {
         List<Rows.Row> r = new ArrayList<>();
         switch (which) {
             case HOME: {
                 List<Library.Progress> cw = lib.continueWatching();
+                cw.removeIf(p -> p.item.adult);
                 r.add(new Rows.Row("Continuer à regarder", Rows.WIDE, cw));
                 // the collections, near the top as in Nuvio
                 r.addAll(shelfRows());
                 r.add(new Rows.Row("Chaînes regardées récemment", Rows.CHANNEL, lib.recentLive()));
-                r.add(new Rows.Row("Ma liste", Rows.POSTER, merge(lib.favs(Model.MOVIE), lib.favs(Model.SERIES))));
+                r.add(new Rows.Row("Ma liste", Rows.POSTER, notAdultItems(merge(lib.favs(Model.MOVIE), lib.favs(Model.SERIES)))));
                 r.add(new Rows.Row("Films ajoutés récemment", Rows.POSTER, Catalog.recent(cat.allMovies, 30)));
                 r.add(new Rows.Row("Séries ajoutées récemment", Rows.POSTER, Catalog.recent(cat.allSeries, 30)));
                 // the first catalogue of each add-on kind
                 Addons ad = Addons.get(this);
-                for (List<Addons.Row> l : List.of(ad.movies, ad.series, ad.anime)) {
+                for (List<Addons.Row> l : List.of(notAdult(ad.movies), notAdult(ad.series), notAdult(ad.anime))) {
                     if (!l.isEmpty()) r.add(new Rows.Row(l.get(0).name, Rows.POSTER, l.get(0).items).all(l.get(0)));
                 }
                 r.add(new Rows.Row("Chaînes favorites", Rows.CHANNEL, lib.favs(Model.LIVE)));
@@ -607,16 +678,16 @@ public class MainActivity extends Activity implements Catalog.Listener {
             }
             case MOVIES:
                 r.add(new Rows.Row("Ajoutés récemment", Rows.POSTER, Catalog.recent(cat.allMovies, 40)));
-                for (Addons.Row a : Addons.get(this).movies) r.add(new Rows.Row(a.name, Rows.POSTER, a.items).all(a));
+                for (Addons.Row a : notAdult(Addons.get(this).movies)) r.add(new Rows.Row(a.name, Rows.POSTER, a.items).all(a));
                 for (Model.Category c : cat.movies) r.add(new Rows.Row(c.name + "  ·  " + c.items.size(), Rows.POSTER, c.items).all(c));
                 break;
             case SERIES:
                 r.add(new Rows.Row("Ajoutées récemment", Rows.POSTER, Catalog.recent(cat.allSeries, 40)));
-                for (Addons.Row a : Addons.get(this).series) r.add(new Rows.Row(a.name, Rows.POSTER, a.items).all(a));
+                for (Addons.Row a : notAdult(Addons.get(this).series)) r.add(new Rows.Row(a.name, Rows.POSTER, a.items).all(a));
                 for (Model.Category c : cat.series) r.add(new Rows.Row(c.name + "  ·  " + c.items.size(), Rows.POSTER, c.items).all(c));
                 break;
             case ANIME:
-                for (Addons.Row a : Addons.get(this).anime) r.add(new Rows.Row(a.name, Rows.POSTER, a.items).all(a));
+                for (Addons.Row a : notAdult(Addons.get(this).anime)) r.add(new Rows.Row(a.name, Rows.POSTER, a.items).all(a));
                 break;
             case COLLECTIONS:
                 if (collTab == 0) r.addAll(shelfRows());
@@ -624,9 +695,20 @@ public class MainActivity extends Activity implements Catalog.Listener {
                 break;
             case FAVS:
                 r.add(new Rows.Row("Chaînes", Rows.CHANNEL, lib.favs(Model.LIVE)));
-                r.add(new Rows.Row("Films", Rows.POSTER, lib.favs(Model.MOVIE)));
-                r.add(new Rows.Row("Séries", Rows.POSTER, lib.favs(Model.SERIES)));
+                r.add(new Rows.Row("Films", Rows.POSTER, notAdultItems(lib.favs(Model.MOVIE))));
+                r.add(new Rows.Row("Séries", Rows.POSTER, notAdultItems(lib.favs(Model.SERIES))));
                 break;
+            case ADULT: {
+                // their saved titles, then every catalogue of the adult add-ons
+                List<Model.Item> mine = new ArrayList<>();
+                for (Model.Item i : merge(lib.favs(Model.MOVIE), lib.favs(Model.SERIES))) if (i.adult) mine.add(i);
+                r.add(new Rows.Row("Ma liste", Rows.POSTER, mine));
+                Addons ad = Addons.get(this);
+                for (List<Addons.Row> l : List.of(ad.movies, ad.series, ad.anime)) {
+                    for (Addons.Row a : l) if (a.adult) r.add(new Rows.Row(a.name, Rows.POSTER, a.items).all(a));
+                }
+                break;
+            }
         }
         return r;
     }

@@ -45,6 +45,8 @@ final class Model {
         String folded;
         /** from a Stremio add-on: its type ("movie", "series") and id ("tt0111161", "kitsu:1:2") */
         String stype, sid;
+        /** from an adult add-on: hidden until the adult code is typed, never kept in the history */
+        boolean adult;
         /** add-on titles: the kind of stream chosen, to take the same for the next episode */
         String bingeGroup;
         /** add-on subtitles for the stream: {url, language} */
@@ -86,6 +88,7 @@ final class Model {
                         .putOpt("c", category).putOpt("u", url).putOpt("epg", epgId).put("num", num)
                         .putOpt("y", year).putOpt("sid", seriesId).putOpt("sn", seriesName)
                         .put("s", season).put("e", episode).putOpt("st", stype).putOpt("aid", sid);
+                if (adult) o.put("ad", true);
             } catch (Exception ignored) {
             }
             return o;
@@ -109,6 +112,9 @@ final class Model {
             i.episode = o.optInt("e");
             i.stype = o.optString("st", null);
             i.sid = o.optString("aid", null);
+            // saved before the flag existed: Stremio ids are never web addresses, but the tube
+            // sites' add-ons use the video page's
+            i.adult = o.optBoolean("ad") || i.sid != null && i.sid.startsWith("http");
             return i;
         }
     }

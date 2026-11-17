@@ -111,7 +111,8 @@ final class Library {
     }
 
     void setProgress(Model.Item i, long pos, long dur) {
-        if (incognito) {
+        // adult titles are never written down: only this session remembers where they were left
+        if (incognito || i.adult) {
             Progress p = quiet.get(i.key());
             if (p == null) quiet.put(i.key(), p = new Progress(i));
             p.pos = pos;
@@ -141,7 +142,7 @@ final class Library {
             if (p.item.kind == Model.EPISODE) {
                 if (!shows.add(p.item.seriesId)) continue;
             }
-            if (p.finished() || p.pos < 30_000) continue;
+            if (p.finished() || p.pos < 30_000 || p.item.adult) continue;
             out.add(p);
             if (out.size() >= 20) break;
         }
