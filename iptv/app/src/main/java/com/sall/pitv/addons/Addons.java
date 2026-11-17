@@ -94,6 +94,8 @@ public final class Addons {
         public final List<Model.Item> items;
         /** from an adult add-on: on the Adulte page only, once the code is typed */
         public boolean adult;
+        /** a search's results: the words, asked again with each next page */
+        public String search;
         /** where the catalogue's next titles are asked for (null when it can't be paged) */
         public String pages, genre, type;
 
@@ -108,7 +110,8 @@ public final class Addons {
     public List<Model.Item> more(Row r, int skip) throws Exception {
         List<Model.Item> out = new ArrayList<>();
         if (r.pages == null) return out;
-        String url = r.pages + "/" + (r.genre == null || r.genre.isEmpty() ? "" : "genre=" + enc(r.genre) + "&") + "skip=" + skip + ".json";
+        String url = r.pages + "/" + (r.genre == null || r.genre.isEmpty() ? "" : "genre=" + enc(r.genre) + "&")
+                + (r.search == null ? "" : "search=" + enc(r.search) + "&") + "skip=" + skip + ".json";
         JSONArray metas = new JSONObject(cached(url, false)).optJSONArray("metas");
         for (int k = 0; metas != null && k < metas.length(); k++) {
             Model.Item it = item(metas.optJSONObject(k), r.type);
@@ -438,7 +441,8 @@ public final class Addons {
 
     /** told each add-on's matches as they come, then once all have answered (on a background thread) */
     public interface Searching {
-        void found(Addon a, int kind, List<Model.Item> items);
+        /** [paged]: the row to ask for more of, when one catalogue answered and it takes "skip" */
+        void found(Addon a, int kind, List<Model.Item> items, Row paged);
 
         void done();
     }
@@ -471,7 +475,8 @@ public final class Addons {
                     JSONObject c = cats.optJSONObject(i);
                     String type = c == null ? "" : c.optString("type");
                     if (kind(type) != kind || !takesSearch(c)) continue;
-                    asks.add(new String[]{type, a.base + "/catalog/" + type + "/" + enc(c.optString("id")) + "/search=" + enc(q) + ".json"});
+                    asks.add(new String[]{type, a.base + "/catalog/" + type + "/" + enc(c.optString("id")) + "/search=" + enc(q) + ".json",
+                            pages(a, type, c)});
                 }
                 if (asks.isEmpty()) continue;
                 groupsLeft.incrementAndGet();
@@ -498,7 +503,17 @@ public final class Addons {
                         }
                     }
                     if (left.decrementAndGet() > 0) return;
-                    if (current(gen) && !group.isEmpty()) to.found(a, kind, group);
+                    // one catalogue that pages: its next results can be asked for (several, merged,
+                    // can't say which one the next page would come from)
+                    Row paged = null;
+                    if (asks.size() == 1 && asks.get(0)[2] != null) {
+                        paged = new Row(a.name + (kind == Model.MOVIE ? " · Films" : " · Séries"), kind, group);
+                        paged.pages = asks.get(0)[2];
+                        paged.type = asks.get(0)[0];
+                        paged.search = q;
+                        paged.adult = a.adult();
+                    }
+                    if (current(gen) && !group.isEmpty()) to.found(a, kind, group, paged);
                     if (groupsLeft.decrementAndGet() == 0 && current(gen)) to.done();
                 });
             }

@@ -1098,10 +1098,13 @@ public class MainActivity extends Activity implements Catalog.Listener {
             // the add-ons search on their side, all at once: each one's row comes as it answers
             Addons.get(this).search(s.trim(), new Addons.Searching() {
                 @Override
-                public void found(Addons.Addon a, int kind, List<Model.Item> items) {
+                public void found(Addons.Addon a, int kind, List<Model.Item> items, Addons.Row paged) {
                     ui.post(() -> {
                         if (!q.getText().toString().equals(s)) return;
-                        rows.addRow(new Rows.Row(a.name + (kind == Model.MOVIE ? " · Films" : " · Séries"), Rows.POSTER, items));
+                        Rows.Row row = new Rows.Row(a.name + (kind == Model.MOVIE ? " · Films" : " · Séries"), Rows.POSTER, items);
+                        // Voir tout: the grid asks the add-on for the next results as it scrolls
+                        if (paged != null) row.all(paged);
+                        rows.addRow(row);
                         hint.setText("");
                     });
                 }
