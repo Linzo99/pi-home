@@ -477,9 +477,9 @@ public class PlayerActivity extends Activity {
         if (http != null) http.setDefaultRequestProperties(headers);
         if (okhttp != null) okhttp.setDefaultRequestProperties(headers);
         MediaItem.Builder b = new MediaItem.Builder().setUri(Uri.parse(url));
-        String lower = url.toLowerCase(Locale.ROOT);
-        if (lower.contains(".m3u8")) b.setMimeType(MimeTypes.APPLICATION_M3U8);
-        else if (lower.contains(".mpd")) b.setMimeType(MimeTypes.APPLICATION_MPD);
+        String format = Net.format(url);
+        if (Net.HLS.equals(format)) b.setMimeType(MimeTypes.APPLICATION_M3U8);
+        else if (Net.DASH.equals(format)) b.setMimeType(MimeTypes.APPLICATION_MPD);
         if (live) b.setLiveConfiguration(new MediaItem.LiveConfiguration.Builder().setTargetOffsetMs(8_000).build());
         if (item.subs != null && !item.subs.isEmpty()) {
             // the add-ons' subtitles, beside the stream's own

@@ -121,6 +121,11 @@ final class Addons {
             return Plugins.quality(name + " " + title);
         }
 
+        /** the language its name or description shows: VF, VOSTFR, MULTI, VO…; "" when it doesn't say */
+        String language() {
+            return Plugins.language(name + " " + title);
+        }
+
         /** the source as remembered for a title: the add-on or script, and its kind of stream */
         String source() {
             return addon + "|" + (bingeGroup != null && !bingeGroup.isEmpty() ? bingeGroup : "q" + quality());
@@ -579,7 +584,7 @@ final class Addons {
         for (int i = 0; s != null && i < s.length(); i++) {
             JSONObject o = s.optJSONObject(i);
             // direct links only: no torrents, no YouTube, no "open in a browser"
-            if (o == null || !o.optString("url").startsWith("http")) continue;
+            if (o == null || !Net.playable(o.optString("url"))) continue;
             Stream st = new Stream();
             st.addon = a.name;
             st.name = o.optString("name", null);

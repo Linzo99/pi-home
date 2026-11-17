@@ -556,11 +556,8 @@ final class Plugins {
                 JSONObject o = arr.optJSONObject(i);
                 if (o == null) continue;
                 String url = o.optString("url", "");
-                String low = url.toLowerCase(Locale.ROOT);
-                // direct links only, never a torrent or a player page; a data: link is a playlist the
-                // script put together itself (e.g. a video with another site's Italian audio)
-                boolean data = low.startsWith("data:");
-                if (!data && (!low.startsWith("http") || low.startsWith("http://127.") || low.contains(".torrent"))) continue;
+                // direct links (or a playlist the script put together itself), never a torrent
+                if (!Net.playable(url)) continue;
                 Addons.Stream st = new Addons.Stream();
                 st.addon = s.name;
                 st.name = first(o.optString("name", null), o.optString("quality", null));

@@ -81,6 +81,53 @@ final class Net {
         while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
     }
 
+    // ---------------------------------------------------------------- stream links
+
+    /**
+     * a link the player can open: a web address, or a data: link holding the media itself (a
+     * source's own playlist, such as one site's video with another's audio), never a torrent or
+     * a local page
+     */
+    static boolean playable(String url) {
+        if (url == null) return false;
+        String low = url.trim().toLowerCase(java.util.Locale.ROOT);
+        if (low.startsWith("data:")) return low.indexOf(',') > 0;
+        return low.startsWith("http") && !low.startsWith("http://127.") && !low.startsWith("http://localhost")
+                && !low.contains(".torrent");
+    }
+
+    static final String HLS = "application/x-mpegURL", DASH = "application/dash+xml";
+
+    /** HLS, DASH, or null to let the player guess from the bytes */
+    static String format(String url) {
+        String low = url.toLowerCase(java.util.Locale.ROOT);
+        if (!low.startsWith("data:")) {
+            if (low.contains(".m3u8")) return HLS;
+            if (low.contains(".mpd")) return DASH;
+            return null;
+        }
+        // data:[//]<type>[;params][;base64],<payload>: the declared type first, then the payload
+        int comma = low.indexOf(',');
+        String head = low.substring(5, comma);
+        if (head.contains("mpegurl") || head.contains("m3u8") || head.contains("/hls")) return HLS;
+        if (head.contains("dash") || head.contains("mpd")) return DASH;
+        String start;
+        try {
+            String body = url.substring(comma + 1);
+            int hash = body.indexOf('#');
+            if (hash >= 0) body = body.substring(0, hash);
+            if (body.length() > 4096) body = body.substring(0, 4096);
+            start = head.contains(";base64")
+                    ? new String(android.util.Base64.decode(body.substring(0, body.length() / 4 * 4), android.util.Base64.DEFAULT), "UTF-8")
+                    : java.net.URLDecoder.decode(body, "UTF-8");
+        } catch (Exception e) {
+            return null;
+        }
+        if (start.trim().startsWith("#EXTM3U")) return HLS;
+        if (start.contains("<MPD")) return DASH;
+        return null;
+    }
+
     private Net() {
     }
 }
