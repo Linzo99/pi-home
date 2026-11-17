@@ -225,6 +225,7 @@ final class Addons {
     static String normalize(String u) {
         u = u.trim();
         if (u.isEmpty()) return null;
+        if (Builtin.is(u)) return u.contains("/manifest.json") ? u : u.replaceFirst("/+$", "") + "/manifest.json";
         if (u.startsWith("stremio://")) u = "https://" + u.substring(10);
         if (!u.startsWith("http")) u = "https://" + u;
         if (!u.contains("/manifest.json")) u = u.replaceFirst("/+$", "") + "/manifest.json";

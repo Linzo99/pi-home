@@ -69,7 +69,7 @@ final class AddonsPage {
             return true;
         });
         TextView tip = Ui.text(a, 11, Ui.FAINT, false);
-        tip.setText("Aussi depuis le téléphone, dans l'onglet IPTV : un lien par ligne.");
+        tip.setText("Aussi depuis le téléphone, dans l'onglet IPTV : un lien par ligne.  ·  Intégré à Pi TV : tapez « erome ».");
         form.addView(tip, Ui.margins(-1, -2, 0, a.dp(6), 0, a.dp(20)));
 
         list = new LinearLayout(a);
@@ -85,7 +85,9 @@ final class AddonsPage {
     }
 
     private void add() {
-        String u = Addons.normalize(url.getText().toString());
+        String typed = url.getText().toString().trim();
+        // the add-ons built into Pi TV, by name
+        String u = typed.equalsIgnoreCase("erome") ? Erome.URL : Addons.normalize(typed);
         if (u == null) {
             Toast.makeText(a, "Collez le lien du manifest.json", Toast.LENGTH_SHORT).show();
             return;
@@ -133,7 +135,7 @@ final class AddonsPage {
             texts.setOrientation(LinearLayout.VERTICAL);
             TextView name = Ui.line(a, 15, Color.WHITE, true);
             // the host only: a link may carry a personal configuration
-            String host = u.replaceFirst("^https?://", "").replaceFirst("/.*", "");
+            String host = Builtin.is(u) ? "intégré à Pi TV" : u.replaceFirst("^https?://", "").replaceFirst("/.*", "");
             name.setText(x != null && !x.name.isEmpty() ? x.name : host);
             texts.addView(name);
             String desc = x == null || x.manifest == null ? "Chargement…" : x.manifest.optString("description", "").replace('\n', ' ').trim();

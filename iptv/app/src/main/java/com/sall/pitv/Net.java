@@ -59,6 +59,8 @@ final class Net {
     }
 
     static String text(String url) throws IOException {
+        // an add-on built into Pi TV answers here, without the network
+        if (Builtin.is(url)) return Builtin.answer(url);
         return new String(bytes(url), java.nio.charset.StandardCharsets.UTF_8);
     }
 
