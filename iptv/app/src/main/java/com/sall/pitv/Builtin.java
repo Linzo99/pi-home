@@ -21,6 +21,7 @@ final class Builtin {
         int q = path.indexOf('?');
         if (q >= 0) path = path.substring(0, q);
         if (name.equals("erome")) return Erome.answer(path);
+        if (name.equals("tasty")) return Tasty.answer(path);
         throw new IOException("no built-in add-on " + name);
     }
 

@@ -69,7 +69,7 @@ final class AddonsPage {
             return true;
         });
         TextView tip = Ui.text(a, 11, Ui.FAINT, false);
-        tip.setText("Aussi depuis le téléphone, dans l'onglet IPTV : un lien par ligne.  ·  Intégré à Pi TV : tapez « erome ».");
+        tip.setText("Aussi depuis le téléphone, dans l'onglet IPTV : un lien par ligne.  ·  Intégrés à Pi TV : tapez « erome » ou « tastyblacks ».");
         form.addView(tip, Ui.margins(-1, -2, 0, a.dp(6), 0, a.dp(20)));
 
         list = new LinearLayout(a);
@@ -87,7 +87,8 @@ final class AddonsPage {
     private void add() {
         String typed = url.getText().toString().trim();
         // the add-ons built into Pi TV, by name
-        String u = typed.equalsIgnoreCase("erome") ? Erome.URL : Addons.normalize(typed);
+        String u = typed.equalsIgnoreCase("erome") ? Erome.URL
+                : typed.equalsIgnoreCase("tastyblacks") ? Tasty.URL : Addons.normalize(typed);
         if (u == null) {
             Toast.makeText(a, "Collez le lien du manifest.json", Toast.LENGTH_SHORT).show();
             return;

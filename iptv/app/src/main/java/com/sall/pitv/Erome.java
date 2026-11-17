@@ -35,7 +35,7 @@ final class Erome {
      * titles that plainly say minors or no consent are never listed nor played; only the
      * unambiguous words, so role-play and ordinary amateur titles aren't caught
      */
-    private static final Pattern BLOCKED = Pattern.compile("\\b(underage|under\\s*age|preteen|pre-teen|child|children"
+    static final Pattern BLOCKED = Pattern.compile("\\b(underage|under\\s*age|preteen|pre-teen|child|children"
             + "|lolita|loli|jailbait|middle\\s*school|1[0-7]\\s*(?:yo|y\\.?o\\.?|yr|yrs|years?\\s*old)"
             + "|rape|raped|drugged|unconscious|passed\\s*out)\\b", Pattern.CASE_INSENSITIVE);
 

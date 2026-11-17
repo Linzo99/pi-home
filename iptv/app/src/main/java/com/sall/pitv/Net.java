@@ -17,12 +17,21 @@ final class Net {
     static String agent = Source.DEFAULT_AGENT;
 
     static InputStream open(String url) throws IOException {
+        return open(url, null, null, null);
+    }
+
+    /**
+     * [agentOr] instead of the IPTV user agent and [referer] when given; [landed], when given,
+     * gets the address after the redirects
+     */
+    static InputStream open(String url, String agentOr, String referer, String[] landed) throws IOException {
         for (int hops = 0; hops < 6; hops++) {
             HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
             c.setConnectTimeout(15_000);
             c.setReadTimeout(60_000);
             c.setInstanceFollowRedirects(false);
-            c.setRequestProperty("User-Agent", agent);
+            c.setRequestProperty("User-Agent", agentOr != null ? agentOr : agent);
+            if (referer != null) c.setRequestProperty("Referer", referer);
             c.setRequestProperty("Accept-Encoding", "gzip");
             int code = c.getResponseCode();
             if (code >= 300 && code < 400 && c.getHeaderField("Location") != null) {
@@ -35,6 +44,7 @@ final class Net {
                 c.disconnect();
                 throw new IOException("HTTP " + code);
             }
+            if (landed != null) landed[0] = url;
             InputStream in = new BufferedInputStream(c.getInputStream(), 64 * 1024);
             return gunzip(in);
         }
@@ -57,6 +67,18 @@ final class Net {
             return out.toByteArray();
         }
     }
+
+    /** a web page as a browser would ask for it: {address after redirects, its text} */
+    static String[] page(String url, String referer) throws IOException {
+        String[] landed = {url};
+        try (InputStream in = open(url, BROWSER, referer, landed)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            copy(in, out);
+            return new String[]{landed[0], new String(out.toByteArray(), java.nio.charset.StandardCharsets.UTF_8)};
+        }
+    }
+
+    static final String BROWSER = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 
     static String text(String url) throws IOException {
         // an add-on built into Pi TV answers here, without the network
