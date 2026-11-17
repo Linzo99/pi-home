@@ -31,11 +31,13 @@ final class Erome {
     /** albums per Erome page */
     private static final int PAGE = 36;
 
-    /** titles that suggest minors or no consent are never listed nor played */
-    private static final Pattern BLOCKED = Pattern.compile("\\b(child|children|kid|kids|underage|under\\s*age|minor|minors|preteen|pre-teen|teenie"
-            + "|lolita|loli|jailbait|schoolgirl|school\\s*girl|middle\\s*school|high\\s*school|young(?:est)?\\s*girl"
-            + "|1[0-7]\\s*(?:yo|y\\.?o\\.?|yr|yrs|years?)|rape|raped|forced|drugged|passed\\s*out|unconscious|asleep|sleeping"
-            + "|hidden\\s*cam|spy\\s*cam|upskirt|creepshot|revenge|leaked\\s*ex)\\b", Pattern.CASE_INSENSITIVE);
+    /**
+     * titles that plainly say minors or no consent are never listed nor played; only the
+     * unambiguous words, so role-play and ordinary amateur titles aren't caught
+     */
+    private static final Pattern BLOCKED = Pattern.compile("\\b(underage|under\\s*age|preteen|pre-teen|child|children"
+            + "|lolita|loli|jailbait|middle\\s*school|1[0-7]\\s*(?:yo|y\\.?o\\.?|yr|yrs|years?\\s*old)"
+            + "|rape|raped|drugged|unconscious|passed\\s*out)\\b", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern ROUTE = Pattern.compile("^/(catalog|meta|stream)/([^/]+)/([^/]+?)(?:/([^/]+))?\\.json$");
     private static final Pattern ALBUM_LINK = Pattern.compile("href=\"https://www\\.erome\\.com/a/([A-Za-z0-9]+)\"");
