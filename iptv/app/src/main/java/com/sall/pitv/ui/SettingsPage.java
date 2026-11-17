@@ -175,7 +175,7 @@ public final class SettingsPage {
     }
 
     private static String incognitoLabel() {
-        return Library.incognito ? "✓ Mode privé activé" : "Mode privé";
+        return Library.incognito ? "✓ Mode privé" : "Mode privé";
     }
 
     private EditText field(LinearLayout parent, String label, String hint, String value, boolean secret) {
