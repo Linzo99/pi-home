@@ -30,7 +30,9 @@ import java.util.regex.Pattern;
  * a video on another tube site. So the catalogues are its category pages, keeping only the cards
  * from sites whose video file can be found in their page (most use the KVS player, which writes
  * the file's address in plain text); the links come from following the card to that page.
- * Its search sits behind a Cloudflare check, so there is none here.
+ * Its search sits behind a Cloudflare check, except for the searches it has cached and the
+ * category names it redirects to: a search tries the site, and when the check stops it, takes
+ * the category whose name best matches the words.
  */
 public final class Tasty {
     public static final String URL = Builtin.SCHEME + "tasty/manifest.json";
@@ -62,11 +64,14 @@ public final class Tasty {
             if (!m.matches()) throw new IOException("not found: " + path);
             String resource = m.group(1), id = URLDecoder.decode(m.group(3), "UTF-8");
             int skip = 0;
+            String search = null;
             if (m.group(4) != null) {
                 Matcher s = Pattern.compile("(?:^|&)skip=(\\d+)").matcher(m.group(4));
                 if (s.find()) skip = Integer.parseInt(s.group(1));
+                Matcher q = Pattern.compile("(?:^|&)search=([^&]*)").matcher(m.group(4));
+                if (q.find()) search = URLDecoder.decode(q.group(1), "UTF-8").trim();
             }
-            if (resource.equals("catalog")) return new JSONObject().put("metas", catalog(id, skip)).toString();
+            if (resource.equals("catalog")) return new JSONObject().put("metas", catalog(id, skip, search)).toString();
             String vx = id.startsWith(PREFIX) ? id.substring(PREFIX.length()) : "";
             if (!vx.matches("[A-Za-z0-9_-]+")) return resource.equals("meta") ? "{\"meta\":null}" : "{\"streams\":[]}";
             if (resource.equals("meta")) {
@@ -82,8 +87,10 @@ public final class Tasty {
     private static JSONObject manifest() throws JSONException {
         JSONArray catalogs = new JSONArray();
         for (String[] c : CATALOGS) {
-            catalogs.put(new JSONObject().put("type", "movie").put("id", c[0]).put("name", c[1])
-                    .put("extra", new JSONArray().put(new JSONObject().put("name", "skip"))));
+            JSONArray extra = new JSONArray().put(new JSONObject().put("name", "skip"));
+            // the first one answers the searches
+            if (c == CATALOGS[0]) extra.put(new JSONObject().put("name", "search"));
+            catalogs.put(new JSONObject().put("type", "movie").put("id", c[0]).put("name", c[1]).put("extra", extra));
         }
         return new JSONObject()
                 .put("id", "com.sall.tastyblacks")
@@ -113,9 +120,12 @@ public final class Tasty {
     private static final Map<String, List<Integer>> totals = new HashMap<>();
     private static final Map<String, Object[]> pages = new HashMap<>();
 
-    private static JSONArray catalog(String id, int skip) throws IOException, JSONException {
+    private static JSONArray catalog(String id, int skip, String search) throws IOException, JSONException {
         String path = null;
-        for (String[] c : CATALOGS) if (c[0].equals(id)) path = c[2];
+        if (search != null && !search.isEmpty()) {
+            path = searchPath(search);
+            id = "search:" + path;
+        } else for (String[] c : CATALOGS) if (c[0].equals(id)) path = c[2];
         if (path == null) return new JSONArray();
         int page;
         synchronized (totals) {
@@ -146,6 +156,78 @@ public final class Tasty {
             int total = (page == 1 ? 0 : t.get(page - 2)) + out.length();
             if (t.size() >= page) t.set(page - 1, total);
             else t.add(total);
+        }
+        return out;
+    }
+
+    // ---------------------------------------------------------------- search
+
+    /** where each search was found: its results, a category, or null for nothing */
+    private static final Map<String, String> searched = new HashMap<>();
+    /** the site's categories: {name, path, video count}, read once a day */
+    private static List<String[]> categories;
+    private static long categoriesUntil;
+
+    /**
+     * the page listing a search's videos: the site's own results when it gives them (a
+     * category's name, or a search it has cached), else the category best named after the words
+     */
+    private static String searchPath(String q) throws IOException {
+        String slug = q.toLowerCase(java.util.Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", "_").replaceAll("^_+|_+$", "");
+        if (slug.isEmpty()) return null;
+        synchronized (searched) {
+            if (searched.containsKey(slug)) return searched.get(slug);
+        }
+        String path = null;
+        try {
+            String[] p = Net.page(SITE + "/en/search/" + slug + "/", SITE + "/en/");
+            // a category's name redirects to it; anything else lands on the check (HTTP 403)
+            if (!p[0].contains("ve=1") && p[1].contains("data-cl-name")) {
+                path = p[0].replaceFirst("^https?://[^/]+", "").replaceFirst("\\?.*$", "");
+                synchronized (pages) {
+                    pages.put(SITE + path, new Object[]{System.currentTimeMillis() + 10 * 60_000L, p[1]});
+                }
+            }
+        } catch (IOException ignored) {
+            // the Cloudflare check: fall back on the categories
+        }
+        if (path == null) path = bestCategory(slug);
+        synchronized (searched) {
+            if (searched.size() > 200) searched.clear();
+            searched.put(slug, path);
+        }
+        return path;
+    }
+
+    /** the category whose name holds the most of the words (the biggest on a tie), or null */
+    private static String bestCategory(String slug) throws IOException {
+        String[] words = slug.split("_");
+        String best = null;
+        int bestScore = 0;
+        long bestCount = -1;
+        for (String[] c : categories()) {
+            String name = " " + c[0].toLowerCase(java.util.Locale.ROOT) + " ";
+            int score = 0;
+            for (String w : words) if (w.length() > 1 && name.contains(" " + w + " ")) score++;
+            long count = Long.parseLong(c[2]);
+            if (score > bestScore || score == bestScore && score > 0 && count > bestCount) {
+                best = c[1];
+                bestScore = score;
+                bestCount = count;
+            }
+        }
+        return best;
+    }
+
+    private static synchronized List<String[]> categories() throws IOException {
+        if (categories != null && categoriesUntil > System.currentTimeMillis()) return categories;
+        String html = Net.page(SITE + "/en/", SITE + "/")[1];
+        List<String[]> out = new ArrayList<>();
+        Matcher m = Pattern.compile("<a title=\"[^\"]*? - ([^:\"]+): ([\\d,]+) videos\" href=\"(/en/\\d+/[^\"]+/)\"").matcher(html);
+        while (m.find()) out.add(new String[]{decode(m.group(1)), m.group(3), m.group(2).replace(",", "")});
+        if (!out.isEmpty()) {
+            categories = out;
+            categoriesUntil = System.currentTimeMillis() + 24 * 3600_000L;
         }
         return out;
     }
