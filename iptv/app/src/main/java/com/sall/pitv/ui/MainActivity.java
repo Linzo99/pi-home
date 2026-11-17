@@ -27,6 +27,7 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.ScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -1186,6 +1187,32 @@ public class MainActivity extends Activity implements Catalog.Listener {
         if (settingsPage != null) settingsPage.refresh();
     }
 
+    /** the scrolling page a settings field sits in, if any */
+    private ScrollView scrollParent(View v) {
+        for (android.view.ViewParent p = v.getParent(); p instanceof View; p = p.getParent()) {
+            if (p instanceof ScrollView) return (ScrollView) p;
+            if (p == settingsBody) break;
+        }
+        return null;
+    }
+
+    /**
+     * scrolls a settings page so the highlighted field shows whole, with room around it for the
+     * frame of its line: Android's own scroll stops with it against the edge, its line cut
+     */
+    private void reveal(View v) {
+        ScrollView sv = scrollParent(v);
+        if (sv == null) return;
+        sv.post(() -> {
+            android.graphics.Rect r = new android.graphics.Rect();
+            v.getDrawingRect(r);
+            sv.offsetDescendantRectToMyCoords(v, r);
+            int m = dp(36), y = sv.getScrollY(), h = sv.getHeight();
+            if (r.bottom + m > y + h) sv.smoothScrollTo(0, r.bottom + m - h);
+            else if (r.top - m < y) sv.smoothScrollTo(0, Math.max(0, r.top - m));
+        });
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
         if (e.getAction() == KeyEvent.ACTION_DOWN && e.getKeyCode() == KeyEvent.KEYCODE_DPAD_UP && page == SETTINGS && settingsBody != null) {
@@ -1194,7 +1221,14 @@ public class MainActivity extends Activity implements Catalog.Listener {
             View f = getCurrentFocus();
             if (f != null && inside(f, settingsBody)) {
                 View next = android.view.FocusFinder.getInstance().findNextFocus((ViewGroup) settingsBody, f, View.FOCUS_UP);
-                (next != null ? next : settingsTabs.get(settingsTab)).requestFocus();
+                if (next != null) {
+                    next.requestFocus();
+                    reveal(next);
+                } else {
+                    settingsTabs.get(settingsTab).requestFocus();
+                    ScrollView sv = scrollParent(f);
+                    if (sv != null) sv.smoothScrollTo(0, 0);
+                }
                 return true;
             }
         }
@@ -1214,7 +1248,14 @@ public class MainActivity extends Activity implements Catalog.Listener {
             View f = getCurrentFocus();
             if (f != null && inside(f, settingsBody)) {
                 View next = android.view.FocusFinder.getInstance().findNextFocus((ViewGroup) settingsBody, f, View.FOCUS_DOWN);
-                if (next != null) next.requestFocus();
+                if (next != null) {
+                    next.requestFocus();
+                    reveal(next);
+                } else {
+                    // the last one: the page's end comes into view, its margin included
+                    ScrollView sv = scrollParent(f);
+                    if (sv != null && sv.getChildCount() > 0) sv.smoothScrollTo(0, sv.getChildAt(0).getHeight());
+                }
                 return true;
             }
         }
