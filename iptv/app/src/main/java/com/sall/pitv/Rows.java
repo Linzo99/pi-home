@@ -103,6 +103,13 @@ final class Rows extends RecyclerView {
         getAdapter().notifyDataSetChanged();
     }
 
+    /** a row added at the end, leaving the highlight where it is */
+    void addRow(Row r) {
+        if (r.items.isEmpty()) return;
+        rows.add(r);
+        getAdapter().notifyItemInserted(rows.size() - 1);
+    }
+
     boolean isEmpty() {
         return rows.isEmpty();
     }

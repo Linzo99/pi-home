@@ -381,42 +381,85 @@ final class Addons {
         return i;
     }
 
-    /** titles whose name matches, from the catalogues that take a search */
-    List<Model.Item> search(String q, int kind) {
-        List<Model.Item> out = new ArrayList<>();
-        List<Future<List<Model.Item>>> jobs = new ArrayList<>();
+    /** told each add-on's matches as they come, then once all have answered (on a background thread) */
+    interface Searching {
+        void found(Addon a, int kind, List<Model.Item> items);
+
+        void done();
+    }
+
+    /** its own threads: a search never waits behind catalogue pages, nor behind an older search */
+    private final ExecutorService searchPool = Executors.newFixedThreadPool(12);
+    private final List<Future<?>> searching = new ArrayList<>();
+    private int searchGen;
+
+    /**
+     * asks every catalogue that takes a search, of every add-on, films and series, all at once;
+     * each add-on's films (or series) are handed over as soon as its catalogues have answered. A
+     * new search drops what is left of the last one.
+     */
+    void search(String q, Searching to) {
+        int gen;
+        synchronized (searching) {
+            for (Future<?> f : searching) f.cancel(true);
+            searching.clear();
+            gen = ++searchGen;
+        }
+        // one group per add-on and kind; it's handed over when its last catalogue answers
+        List<Runnable> jobs = new ArrayList<>();
+        java.util.concurrent.atomic.AtomicInteger groupsLeft = new java.util.concurrent.atomic.AtomicInteger();
         for (Addon a : addons()) {
             JSONArray cats = a.manifest == null ? null : a.manifest.optJSONArray("catalogs");
-            for (int i = 0; cats != null && i < cats.length(); i++) {
-                JSONObject c = cats.optJSONObject(i);
-                String type = c == null ? "" : c.optString("type");
-                if (kind(type) != kind || !takesSearch(c)) continue;
-                String url = a.base + "/catalog/" + type + "/" + enc(c.optString("id")) + "/search=" + enc(q) + ".json";
-                jobs.add(pool.submit(() -> {
-                    List<Model.Item> l = new ArrayList<>();
-                    JSONArray metas = new JSONObject(Net.text(url)).optJSONArray("metas");
-                    for (int k = 0; metas != null && k < metas.length(); k++) {
-                        Model.Item it = item(metas.optJSONObject(k), type);
-                        if (it != null) l.add(it);
-                    }
-                    return l;
-                }));
-            }
-        }
-        java.util.Set<String> seen = new java.util.HashSet<>();
-        for (Future<List<Model.Item>> f : jobs) {
-            try {
-                for (Model.Item i : f.get(20, TimeUnit.SECONDS)) {
-                    if (seen.add(i.key())) {
-                        out.add(i);
-                        byKey.putIfAbsent(i.key(), i);
-                    }
+            for (int kind : new int[]{Model.MOVIE, Model.SERIES}) {
+                List<String[]> asks = new ArrayList<>();
+                for (int i = 0; cats != null && i < cats.length(); i++) {
+                    JSONObject c = cats.optJSONObject(i);
+                    String type = c == null ? "" : c.optString("type");
+                    if (kind(type) != kind || !takesSearch(c)) continue;
+                    asks.add(new String[]{type, a.base + "/catalog/" + type + "/" + enc(c.optString("id")) + "/search=" + enc(q) + ".json"});
                 }
-            } catch (Exception e) {
-                Log.w("PiTV", "addon search", e);
+                if (asks.isEmpty()) continue;
+                groupsLeft.incrementAndGet();
+                java.util.concurrent.atomic.AtomicInteger left = new java.util.concurrent.atomic.AtomicInteger(asks.size());
+                List<Model.Item> group = new ArrayList<>();
+                java.util.Set<String> seen = new java.util.HashSet<>();
+                for (String[] ask : asks) jobs.add(() -> {
+                    List<Model.Item> l = new ArrayList<>();
+                    try {
+                        JSONArray metas = new JSONObject(Net.text(ask[1])).optJSONArray("metas");
+                        for (int k = 0; metas != null && k < metas.length(); k++) {
+                            Model.Item it = item(metas.optJSONObject(k), ask[0]);
+                            if (it != null) l.add(it);
+                        }
+                    } catch (Exception e) {
+                        Log.w("PiTV", "addon search " + a.name + ": " + e);
+                    }
+                    synchronized (group) {
+                        for (Model.Item i : l) if (seen.add(i.key())) {
+                            group.add(i);
+                            byKey.putIfAbsent(i.key(), i);
+                        }
+                    }
+                    if (left.decrementAndGet() > 0) return;
+                    if (current(gen) && !group.isEmpty()) to.found(a, kind, group);
+                    if (groupsLeft.decrementAndGet() == 0 && current(gen)) to.done();
+                });
             }
         }
-        return out;
+        if (jobs.isEmpty()) {
+            to.done();
+            return;
+        }
+        synchronized (searching) {
+            if (gen != searchGen) return;
+            for (Runnable j : jobs) searching.add(searchPool.submit(j));
+        }
+    }
+
+    private boolean current(int gen) {
+        synchronized (searching) {
+            return gen == searchGen;
+        }
     }
 
     private static boolean takesSearch(JSONObject c) {

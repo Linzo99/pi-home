@@ -30,6 +30,8 @@ import java.util.List;
 public class MainActivity extends Activity implements Catalog.Listener {
     /** a film, episode or channel to open, by key: the launcher's entries (TvHome) */
     static final String EXTRA_OPEN = "pitv.open";
+    /** words typed in Pi Home's search: Pi TV opens on its Search page with them */
+    static final String EXTRA_SEARCH = "pitv.search";
     static final int HOME = 0, LIVE = 1, MOVIES = 2, SERIES = 3, ANIME = 4, COLLECTIONS = 5, FAVS = 6, SEARCH = 7, SETTINGS = 8;
     private static final String[] NAMES = {"Accueil", "TV en direct", "Films", "Séries", "Animes", "Collections", "Ma liste", "Recherche", "Paramètres"};
     private static final int[] ICONS = {R.drawable.ic_home, R.drawable.ic_live, R.drawable.ic_movie, R.drawable.ic_series, R.drawable.ic_anime,
@@ -97,6 +99,17 @@ public class MainActivity extends Activity implements Catalog.Listener {
 
     /** an entry chosen on the launcher's row: its film or episode resumes, its channel plays */
     private void openFromLauncher(Intent intent) {
+        String query = intent == null ? null : intent.getStringExtra(EXTRA_SEARCH);
+        if (query != null) {
+            intent.removeExtra(EXTRA_SEARCH);
+            show(SEARCH, true);
+            View field = content.findViewWithTag("first");
+            if (field instanceof EditText) {
+                ((EditText) field).setText(query);
+                ((EditText) field).setSelection(query.length());
+            }
+            return;
+        }
         String key = intent == null ? null : intent.getStringExtra(EXTRA_OPEN);
         if (key == null) return;
         intent.removeExtra(EXTRA_OPEN);
@@ -981,15 +994,24 @@ public class MainActivity extends Activity implements Catalog.Listener {
             hint.setText(s.trim().isEmpty() ? "Tapez quelques lettres, puis descendez vers les résultats."
                     : rows.isEmpty() ? "Recherche dans les add-ons…" : "");
             if (s.trim().length() < 2) return;
-            // the add-ons search on their side: their rows follow when they answer
-            Addons ad = Addons.get(this);
-            cat.async(() -> List.of(ad.search(s.trim(), Model.MOVIE), ad.search(s.trim(), Model.SERIES)), found -> {
-                if (found == null || !q.getText().toString().equals(s)) return;
-                boolean had = rows.hasFocus();
-                r.add(new Rows.Row("Films · add-ons", Rows.POSTER, found.get(0)));
-                r.add(new Rows.Row("Séries et animes · add-ons", Rows.POSTER, found.get(1)));
-                if (!had) rows.setRows(r);
-                hint.setText(rows.isEmpty() ? "Aucun résultat pour « " + s.trim() + " »" : "");
+            // the add-ons search on their side, all at once: each one's row comes as it answers
+            Addons.get(this).search(s.trim(), new Addons.Searching() {
+                @Override
+                public void found(Addons.Addon a, int kind, List<Model.Item> items) {
+                    ui.post(() -> {
+                        if (!q.getText().toString().equals(s)) return;
+                        rows.addRow(new Rows.Row(a.name + (kind == Model.MOVIE ? " · Films" : " · Séries"), Rows.POSTER, items));
+                        hint.setText("");
+                    });
+                }
+
+                @Override
+                public void done() {
+                    ui.post(() -> {
+                        if (q.getText().toString().equals(s) && rows.isEmpty())
+                            hint.setText("Aucun résultat pour « " + s.trim() + " »");
+                    });
+                }
             });
         };
         q.addTextChangedListener(new TextWatcher() {
