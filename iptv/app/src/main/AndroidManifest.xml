@@ -22,7 +22,7 @@
         android:usesCleartextTraffic="true">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.MainActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode"
             android:exported="true"
             android:launchMode="singleTask"
@@ -36,10 +36,17 @@
         </activity>
 
         <activity
-            android:name=".PlayerActivity"
+            android:name=".player.PlayerActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode"
             android:exported="false"
             android:launchMode="singleTop"
             android:screenOrientation="landscape" />
+
+        <!-- the name it had before the code was split into packages: launcher rows and
+             shortcuts saved with it still open the app -->
+        <activity-alias
+            android:name=".MainActivity"
+            android:exported="true"
+            android:targetActivity=".ui.MainActivity" />
     </application>
 </manifest>
