@@ -54,6 +54,12 @@ connected to HDMI 3 of an LG TV. How it works inside, the Pi tweaks and troubles
 
 The background glows in the colour of the highlighted app. From 23:00 to 06:00 the screen dims.
 
+The dock, the buttons, the CPU/RAM chips and the menus are frosted glass: each shows a blurred
+copy of what is behind it (the glow and the highlighted video's artwork; the whole screen, for a
+menu) under a light tint, with a sheen and a bright rim. The blur is made once each time the
+background changes, on a picture a tenth of the screen's size, so it costs nothing while moving
+around.
+
 ### A row that follows the app
 
 The row under the dock shows what the highlighted app publishes: SmartTube's recommendations,
@@ -109,8 +115,11 @@ After midnight, if nothing has been touched for an hour, the Pi goes to sleep by
   every 2 seconds; Android only saves data figures about every 30 minutes. Up to about 75 °C is normal; the Pi slows itself down from
   80 °C.
 - **Rechercher des mises à jour**: checks SmartTube and Nuvio now (see below).
-- **Rappel des prières**: turns the prayer reminder on or off.
-- **Sons de navigation**: Android's click sounds.
+- **Redémarrer le Bluetooth**: when Bluetooth stops working. The Pi's Bluetooth chip sometimes
+  reports a hardware error; Android then crashes a few times in a row and gives up, leaving
+  Bluetooth off. This resets the chip itself (its driver is unbound and bound again, which powers
+  it off and on and reloads its firmware), then starts Android's Bluetooth again. Takes about 15
+  seconds; paired devices reconnect by themselves.
 - **Redémarrer le Pi**: restarts the Pi, after a confirmation.
 
 ---
@@ -233,10 +242,10 @@ updates must use the same keys. They're deliberately left out of Git.
 
 | Path | What it is |
 |---|---|
-| `src/com/sall/pihome/` | The launcher. `MainActivity` is the home screen; `WatchNext`, `Weather`, `Prayers`, `Updates`, `PiInfo` fetch its data; `ClockDream` is the screensaver; `GlowView` draws the glow |
+| `src/com/sall/pihome/` | The launcher. `MainActivity` is the home screen; `WatchNext`, `Weather`, `Prayers`, `Updates`, `PiInfo` fetch its data; `ClockDream` is the screensaver; `GlowView` draws the glow; `Glass` the frosted panels |
 | `res/` | Icons and the theme |
 | `AndroidManifest.xml` | Permissions, the home screen and the screensaver |
-| `bridge/lg-simplink.sh` | The LG remote bridge, which also carries out sleep, restart and installs |
+| `bridge/lg-simplink.sh` | The LG remote bridge, which also carries out sleep, restart, installs and the Bluetooth reset |
 | `bridge/lg-simplink.rc` | Starts the bridge at boot |
 | `privapp-permissions-pihome.xml` | Allows the launcher's three system permissions |
 | `airplay/` | The AirPlay receiver, a separate app built with Gradle; see its [README](airplay/README.md) |

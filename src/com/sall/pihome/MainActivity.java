@@ -150,6 +150,10 @@ public class MainActivity extends Activity {
     private HorizontalScrollView watchScroll;
     private View night;
     private FrameLayout menuLayer;
+    private FrameLayout root;
+    /** what the glass shows: the glow and artwork behind the page, and the whole screen behind a menu */
+    private final Glass.Source behind = new Glass.Source(), behindMenu = new Glass.Source();
+    private final Runnable captureBehind = this::captureBehind;
     private View focusBeforeMenu;
     private App moving;
     /** the app whose content the row under the dock shows; null = every app's "continue watching" */
@@ -309,9 +313,10 @@ public class MainActivity extends Activity {
     // ---------------------------------------------------------------- layout
 
     private View buildLayout() {
-        FrameLayout root = new FrameLayout(this);
+        root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
         glow = new GlowView(this);
+        glow.onSettled = this::scheduleGlass;
         glow.setColorNow(prefs.getInt("glow", 0xFF3A3A48));
         root.addView(glow, new FrameLayout.LayoutParams(-1, -1));
 
@@ -338,6 +343,8 @@ public class MainActivity extends Activity {
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setFillViewport(true);
         scroll.setClipChildren(false);
+        // the glass is lined up with the screen: it redraws as the page moves
+        scroll.setOnScrollChangeListener((v, x, y, ox, oy) -> behind.invalidate());
         root.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout content = new LinearLayout(this);
@@ -367,7 +374,7 @@ public class MainActivity extends Activity {
         dock.setPadding(dp(12), dp(12), dp(12), dp(12));
         dock.setClipChildren(false);
         dock.setClipToPadding(false);
-        dock.setBackground(rounded(0x17FFFFFF, dp(26)));
+        dock.setBackground(new Glass.Panel(dock, behind, dp(26), 0x0FFFFFFF, rimWidth()));
         LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(-2, -2);
         dl.topMargin = dp(16);
         content.addView(dock, dl);
@@ -413,7 +420,37 @@ public class MainActivity extends Activity {
         root.addView(menuLayer, new FrameLayout.LayoutParams(-1, -1));
 
         setHint();
+        root.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if (r - l != or - ol || b - t != ob - ot) scheduleGlass();
+        });
         return root;
+    }
+
+    // ---------------------------------------------------------------- glass
+
+    private int rimWidth() {
+        return Math.max(1, dp(1));
+    }
+
+    /** once the glow or the artwork has settled */
+    private void scheduleGlass() {
+        ui.removeCallbacks(captureBehind);
+        ui.postDelayed(captureBehind, 120);
+    }
+
+    private void captureBehind() {
+        behind.capture(root.getWidth(), root.getHeight(), c -> {
+            glow.draw(c);
+            float alpha = backdropLayer.getAlpha();
+            if (alpha > 0.01f) {
+                c.save();
+                c.translate(backdropLayer.getLeft(), backdropLayer.getTop());
+                c.saveLayerAlpha(0, 0, backdropLayer.getWidth(), backdropLayer.getHeight(), Math.round(alpha * 255));
+                backdropLayer.draw(c);
+                c.restore();
+                c.restore();
+            }
+        });
     }
 
     private View buildTopBar() {
@@ -536,15 +573,16 @@ public class MainActivity extends Activity {
         t.setCompoundDrawablesRelative(d, null, null, null);
         t.setFocusable(true);
         t.setClickable(true);
+        Drawable glass = new Glass.Panel(t, behind, dp(20), 0x14FFFFFF, rimWidth());
         t.setOnFocusChangeListener((v, has) -> {
             int fg = has ? Color.BLACK : Color.WHITE;
             t.setTextColor(fg);
             t.setCompoundDrawableTintList(ColorStateList.valueOf(fg));
-            t.setBackground(rounded(has ? Color.WHITE : 0x24FFFFFF, dp(20)));
+            t.setBackground(has ? rounded(Color.WHITE, dp(20)) : glass);
             if (compact) pillText(t, has, t.getContentDescription().toString());
             v.animate().scaleX(has ? 1.06f : 1f).scaleY(has ? 1.06f : 1f).setDuration(140).start();
         });
-        t.setBackground(rounded(0x24FFFFFF, dp(20)));
+        t.setBackground(glass);
         t.setCompoundDrawableTintList(ColorStateList.valueOf(Color.WHITE));
         if (compact) pillText(t, false, label);
         else {
@@ -564,8 +602,7 @@ public class MainActivity extends Activity {
     /** a frosted chip whose fill shows a percentage, e.g. "CPU 12 %" */
     private TextView glassChip() {
         TextView t = text(11, 0xE6FFFFFF, "sans-serif-medium");
-        GradientDrawable glass = rounded(0x1AFFFFFF, dp(12));
-        glass.setStroke(Math.max(1, dp(1) / 2), 0x33FFFFFF);
+        Drawable glass = new Glass.Panel(t, behind, dp(12), 0x0FFFFFFF, rimWidth());
         ClipDrawable fill = new ClipDrawable(rounded(0x33FFFFFF, dp(12)), Gravity.START, ClipDrawable.HORIZONTAL);
         t.setBackground(new LayerDrawable(new Drawable[] {glass, fill}));
         t.setPadding(dp(10), dp(4), dp(10), dp(4));
@@ -711,6 +748,8 @@ public class MainActivity extends Activity {
             }
         });
         t.setClipToOutline(true);
+        // a glass edge over the banner, until it's highlighted (raise)
+        t.setForeground(Glass.rim(dp(12), rimWidth()));
         return t;
     }
 
@@ -759,7 +798,7 @@ public class MainActivity extends Activity {
     private View hiddenTile() {
         int w = dp(148), h = w * 9 / 16;
         FrameLayout t = tileFrame(w, h);
-        t.setBackground(rounded(0x1FFFFFFF, dp(12)));
+        t.setBackground(new Glass.Panel(t, behind, dp(12), 0x14FFFFFF, rimWidth()));
         ImageView img = new ImageView(this);
         img.setImageResource(R.drawable.ic_hidden);
         img.setImageTintList(ColorStateList.valueOf(0xB3FFFFFF));
@@ -932,7 +971,7 @@ public class MainActivity extends Activity {
         v.animate().scaleX(has ? scale : 1f).scaleY(has ? scale : 1f).translationZ(has ? dp(12) : 0)
                 .setDuration(has ? 260 : 160)
                 .setInterpolator(has ? new OvershootInterpolator(2.2f) : new DecelerateInterpolator()).start();
-        v.setForeground(has ? rounded(Color.TRANSPARENT, dp(12), border) : null);
+        v.setForeground(has ? rounded(Color.TRANSPARENT, dp(12), border) : Glass.rim(dp(12), rimWidth()));
     }
 
     private void launch(App a) {
@@ -1088,14 +1127,14 @@ public class MainActivity extends Activity {
             ui.post(() -> {
                 if (backdropFor != it || b == null) return;
                 backdrop.setImageBitmap(b);
-                backdropLayer.animate().alpha(0.9f).setDuration(450).start();
+                backdropLayer.animate().alpha(0.9f).setDuration(450).withEndAction(this::scheduleGlass).start();
             });
         });
     }
 
     private void hideBackdrop() {
         backdropFor = null;
-        backdropLayer.animate().alpha(0f).setDuration(300).start();
+        backdropLayer.animate().alpha(0f).setDuration(300).withEndAction(this::scheduleGlass).start();
     }
 
     // ---------------------------------------------------------------- now playing
@@ -1352,7 +1391,7 @@ public class MainActivity extends Activity {
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(20), dp(14), dp(24), dp(14));
-        card.setBackground(rounded(0xF21C1C22, dp(22)));
+        card.setBackground(new Glass.Panel(card, null, dp(22), 0xE61C1C22, rimWidth()));
         ImageView icon = new ImageView(this);
         icon.setImageResource(R.drawable.ic_mosque);
         icon.setImageTintList(ColorStateList.valueOf(Color.WHITE));
@@ -1398,22 +1437,13 @@ public class MainActivity extends Activity {
     // ---------------------------------------------------------------- settings menu and Infos Pi
 
     private void showSettingsMenu() {
-        boolean sounds = Settings.System.getInt(getContentResolver(), Settings.System.SOUND_EFFECTS_ENABLED, 1) == 1;
-        boolean reminder = prefs.getBoolean("prayerReminder", true);
         showMenu("Paramètres",
-                new String[] {"Paramètres Android", "Infos Pi", "Rechercher des mises à jour",
-                        "Rappel des prières : " + (reminder ? "activé" : "désactivé"),
-                        "Sons de navigation : " + (sounds ? "activés" : "désactivés"), "Redémarrer le Pi", "Fermer"},
+                new String[] {"Paramètres Android", "Infos Pi", "Rechercher des mises à jour", "Redémarrer le Bluetooth",
+                        "Redémarrer le Pi", "Fermer"},
                 new Runnable[] {() -> openSettings(Settings.ACTION_SETTINGS), this::showPiInfo, () -> checkUpdates(true), () -> {
-                    prefs.edit().putBoolean("prayerReminder", !reminder).apply();
-                    Toast.makeText(this, reminder ? "Rappel des prières désactivé" : "Rappel des prières activé", Toast.LENGTH_SHORT).show();
-                }, () -> {
-                    try {
-                        Settings.System.putInt(getContentResolver(), Settings.System.SOUND_EFFECTS_ENABLED, sounds ? 0 : 1);
-                        Toast.makeText(this, sounds ? "Sons désactivés" : "Sons activés", Toast.LENGTH_SHORT).show();
-                    } catch (Exception e) {
-                        Toast.makeText(this, "Impossible de changer les sons", Toast.LENGTH_SHORT).show();
-                    }
+                    // the chip itself is reset, not just Android's side (see lg-simplink.sh)
+                    Toast.makeText(this, "Redémarrage du Bluetooth… (une quinzaine de secondes)", Toast.LENGTH_LONG).show();
+                    request("bt-restart");
                 }, () -> showMenu("Redémarrer le Pi ?",
                         new String[] {"Redémarrer", "Annuler"},
                         new Runnable[] {() -> {
@@ -1558,7 +1588,7 @@ public class MainActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(20), dp(18), dp(20), dp(14));
-        card.setBackground(rounded(0xF21C1C22, dp(24)));
+        card.setBackground(new Glass.Panel(card, behindMenu, dp(24), 0xA61C1C22, rimWidth()));
         TextView h = text(18, Color.WHITE, "sans-serif-medium");
         h.setText(heading);
         h.setPadding(dp(6), 0, dp(6), dp(6));
@@ -1590,14 +1620,17 @@ public class MainActivity extends Activity {
     private void openMenu(LinearLayout card, View focusFirst) {
         focusBeforeMenu = getCurrentFocus();
         menuLayer.removeAllViews();
-        menuLayer.setBackgroundColor(0x99000000);
+        // the screen as it is, blurred behind the card
+        behindMenu.capture(root.getWidth(), root.getHeight(), root::draw);
+        menuLayer.setBackgroundColor(0x73000000);
         menuLayer.setClickable(true);
         menuLayer.addView(card, new FrameLayout.LayoutParams(dp(380), -2, Gravity.CENTER));
         scroll.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
         card.setAlpha(0f);
         card.setScaleX(0.94f);
         card.setScaleY(0.94f);
-        card.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160).start();
+        card.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160)
+                .withEndAction(() -> card.getBackground().invalidateSelf()).start();
         if (focusFirst != null) focusFirst.post(() -> focus(focusFirst));
     }
 

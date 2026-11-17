@@ -16,6 +16,8 @@ public class GlowView extends View {
     private int color = 0xFF3A3A48, target = color;
     private float cx = 0.24f, cy = 0.02f;
     private ValueAnimator anim;
+    /** called once the colour has settled: the glass panels take a new picture of it */
+    Runnable onSettled;
 
     public GlowView(Context c) {
         super(c);
@@ -31,6 +33,12 @@ public class GlowView extends View {
             color = (int) a.getAnimatedValue();
             invalidate();
         });
+        anim.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(android.animation.Animator a) {
+                if (onSettled != null) onSettled.run();
+            }
+        });
         anim.start();
     }
 
@@ -38,6 +46,7 @@ public class GlowView extends View {
         if (anim != null) anim.cancel();
         color = target = to;
         invalidate();
+        if (onSettled != null) post(onSettled);
     }
 
     public int getTargetColor() {
@@ -49,6 +58,7 @@ public class GlowView extends View {
         cx = fx;
         cy = fy;
         invalidate();
+        if (onSettled != null) post(onSettled);
     }
 
     @Override

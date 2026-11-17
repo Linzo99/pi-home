@@ -107,6 +107,14 @@ while :; do
     "sleep-in "*) left=${r#sleep-in };;
     sleep-cancel) left=0;;
     reboot) svc power reboot || reboot;;
+    # the Bluetooth chip can stop answering after a "Hardware Error" and Android then gives up
+    # after a few crashes: rebinding its driver power-cycles the chip and reloads its firmware
+    bt-restart) (cmd bluetooth_manager disable; sleep 2
+        stop vendor.bluetooth-rpi
+        echo serial0-0 > /sys/bus/serial/drivers/hci_uart_bcm/unbind; sleep 1
+        echo serial0-0 > /sys/bus/serial/drivers/hci_uart_bcm/bind; sleep 3
+        start vendor.bluetooth-rpi; sleep 2
+        cmd bluetooth_manager enable) &;;
     # Pi Home's app updates: APKs it downloaded into its own files, installed in the background
     "install "*) (for f in ${r#install }; do
         echo "$(date) $f" >> $INSTLOG
