@@ -605,6 +605,7 @@ public class PlayerActivity extends Activity {
     }
 
     private static void saveSource(Context c, Model.Item i) {
+        if (Library.incognito) return;
         c.getSharedPreferences("player", MODE_PRIVATE).edit().putString(sourceKey(i), i.source).putString("src.latest", i.source).apply();
     }
 

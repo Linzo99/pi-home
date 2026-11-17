@@ -35,12 +35,17 @@ final class Library {
     }
 
     private static Library instance;
+    /** private mode: nothing watched is written down, in this file or anywhere else */
+    static volatile boolean incognito;
+    /** where things were left during private mode: this session only, never shown in a row */
+    private final Map<String, Progress> quiet = new java.util.HashMap<>();
     private final File file;
     private final Map<String, Model.Item> favs = new LinkedHashMap<>();
     private final Map<String, Progress> progress = new LinkedHashMap<>();
     private final List<Model.Item> recentLive = new ArrayList<>();
 
     static synchronized Library get(Context c) {
+        incognito = c.getSharedPreferences("player", Context.MODE_PRIVATE).getBoolean("incognito", false);
         String id = Source.load(c).id();
         if (instance == null || !instance.file.getName().equals("library-" + id + ".json")) {
             instance = new Library(new File(c.getFilesDir(), "library-" + id + ".json"));
@@ -97,14 +102,23 @@ final class Library {
     }
 
     Progress progress(Model.Item i) {
-        return progress.get(i.key());
+        return progress(i.key());
     }
 
     Progress progress(String key) {
-        return progress.get(key);
+        Progress q = quiet.get(key);
+        return q != null ? q : progress.get(key);
     }
 
     void setProgress(Model.Item i, long pos, long dur) {
+        if (incognito) {
+            Progress p = quiet.get(i.key());
+            if (p == null) quiet.put(i.key(), p = new Progress(i));
+            p.pos = pos;
+            p.dur = dur;
+            p.time = System.currentTimeMillis();
+            return;
+        }
         Progress p = progress.get(i.key());
         if (p == null) p = new Progress(i);
         progress.remove(i.key());
@@ -137,13 +151,16 @@ final class Library {
     /** the episode last played in a series, if any */
     Progress lastEpisode(String seriesId) {
         Progress best = null;
-        for (Progress p : progress.values()) {
+        List<Progress> all = new ArrayList<>(progress.values());
+        all.addAll(quiet.values());
+        for (Progress p : all) {
             if (p.item.kind == Model.EPISODE && seriesId.equals(p.item.seriesId) && (best == null || p.time > best.time)) best = p;
         }
         return best;
     }
 
     void watchedLive(Model.Item ch) {
+        if (incognito) return;
         for (int i = 0; i < recentLive.size(); i++) {
             if (recentLive.get(i).key().equals(ch.key())) {
                 recentLive.remove(i);
@@ -157,6 +174,35 @@ final class Library {
 
     List<Model.Item> recentLive() {
         return new ArrayList<>(recentLive);
+    }
+
+    /** switches private mode on or off; what was left during it is forgotten when it ends */
+    static void setIncognito(Context c, boolean on) {
+        incognito = on;
+        c.getSharedPreferences("player", Context.MODE_PRIVATE).edit().putBoolean("incognito", on).apply();
+        if (!on && instance != null) synchronized (instance) {
+            instance.quiet.clear();
+        }
+    }
+
+    /**
+     * forgets what was watched, for every source: where films and episodes were left, the
+     * channels watched last and the link each title last played from. The favourites stay.
+     */
+    static synchronized void clearHistory(Context c) {
+        File[] files = c.getFilesDir().listFiles((d, n) -> n.startsWith("library-") && n.endsWith(".json"));
+        for (File f : files == null ? new File[0] : files) {
+            Library l = instance != null && instance.file.equals(f) ? instance : new Library(f);
+            l.progress.clear();
+            l.quiet.clear();
+            l.recentLive.clear();
+            l.save();
+        }
+        android.content.SharedPreferences p = c.getSharedPreferences("player", Context.MODE_PRIVATE);
+        android.content.SharedPreferences.Editor e = p.edit();
+        for (String k : p.getAll().keySet()) if (k.startsWith("src.")) e.remove(k);
+        e.apply();
+        TvHome.sync(c);
     }
 
     private void save() {

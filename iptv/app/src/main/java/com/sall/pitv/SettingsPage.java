@@ -27,6 +27,7 @@ final class SettingsPage {
     private final LinearLayout xtFields, m3uFields;
     private String type;
     private SetupServer setup;
+    private TextView privacyFirst;
 
     SettingsPage(MainActivity a) {
         this.a = a;
@@ -74,11 +75,13 @@ final class SettingsPage {
         proxy = field(form, "Proxy pour les chaînes géo-bloquées (facultatif, hôte:port)", "100.113.181.10:8888", s.proxy, false);
 
         LinearLayout actions = new LinearLayout(a);
-        actions.addView(Ui.button(a, 0, "Enregistrer et charger", v -> save(read())));
-        actions.addView(Ui.button(a, R.drawable.ic_replay, "Actualiser", v -> {
+        TextView saveB = Ui.button(a, 0, "Enregistrer et charger", v -> save(read()));
+        TextView reloadB = Ui.button(a, R.drawable.ic_replay, "Actualiser", v -> {
             a.cat.load(true);
             Toast.makeText(a, "Mise à jour de la liste…", Toast.LENGTH_SHORT).show();
-        }), Ui.margins(-2, -2, a.dp(10), 0, 0, 0));
+        });
+        actions.addView(saveB);
+        actions.addView(reloadB, Ui.margins(-2, -2, a.dp(10), 0, 0, 0));
         form.addView(actions, Ui.margins(-2, -2, 0, a.dp(22), 0, 0));
 
         LinearLayout side = new LinearLayout(a);
@@ -94,13 +97,70 @@ final class SettingsPage {
         state = Ui.text(a, 12, Ui.DIM, false);
         state.setLineSpacing(a.dp(3), 1f);
         side.addView(state, Ui.margins(-1, -2, 0, a.dp(18), 0, 0));
+        LinearLayout right = new LinearLayout(a);
+        right.setOrientation(LinearLayout.VERTICAL);
+        right.addView(side, new LinearLayout.LayoutParams(-1, -2));
+        right.addView(privacy(), Ui.margins(-1, -2, 0, a.dp(18), 0, 0));
+        // the panel sits higher than these buttons: Right from them goes there all the same
+        reloadB.setNextFocusRightId(privacyFirst.getId());
+        saveB.setNextFocusRightId(privacyFirst.getId());
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(0, -2, 1f);
         sp.leftMargin = a.dp(28);
         sp.topMargin = a.dp(48);
-        cols.addView(side, sp);
+        cols.addView(right, sp);
 
         setType(type);
         refresh();
+    }
+
+    /** private mode, and forgetting what was watched */
+    private View privacy() {
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(a.dp(22), a.dp(18), a.dp(22), a.dp(18));
+        box.setBackground(Ui.rounded(0xFF1F1F1F, a.dp(12)));
+        TextView t = Ui.text(a, 15, Color.WHITE, true);
+        t.setText("Confidentialité");
+        box.addView(t);
+        TextView about = Ui.text(a, 13, Ui.DIM, false);
+        about.setLineSpacing(a.dp(3), 1f);
+        about.setText("En mode privé, rien de ce que vous regardez n'est retenu : ni « Continuer à regarder », ni les chaînes récentes, ni la dernière source.");
+        box.addView(about, Ui.margins(-1, -2, 0, a.dp(8), 0, a.dp(14)));
+        LinearLayout buttons = new LinearLayout(a);
+        TextView[] incog = new TextView[1];
+        incog[0] = Ui.button(a, 0, incognitoLabel(), v -> {
+            Library.setIncognito(a, !Library.incognito);
+            incog[0].setText(incognitoLabel());
+            Toast.makeText(a, Library.incognito ? "Mode privé activé" : "Mode privé désactivé", Toast.LENGTH_SHORT).show();
+        });
+        incog[0].setId(View.generateViewId());
+        privacyFirst = incog[0];
+        buttons.addView(incog[0]);
+        TextView[] clear = new TextView[1];
+        Runnable reset = () -> clear[0].setText("Effacer l'historique");
+        clear[0] = Ui.button(a, 0, "Effacer l'historique", v -> {
+            // asked twice: it can't be undone
+            if (!"confirm".equals(clear[0].getTag())) {
+                clear[0].setTag("confirm");
+                clear[0].setText("Appuyez encore pour effacer");
+                clear[0].postDelayed(() -> {
+                    clear[0].setTag(null);
+                    reset.run();
+                }, 4000);
+                return;
+            }
+            clear[0].setTag(null);
+            reset.run();
+            Library.clearHistory(a);
+            Toast.makeText(a, "Historique effacé (Ma liste est conservée)", Toast.LENGTH_LONG).show();
+        });
+        buttons.addView(clear[0], Ui.margins(-2, -2, a.dp(10), 0, 0, 0));
+        box.addView(buttons);
+        return box;
+    }
+
+    private static String incognitoLabel() {
+        return Library.incognito ? "✓ Mode privé activé" : "Mode privé";
     }
 
     private EditText field(LinearLayout parent, String label, String hint, String value, boolean secret) {

@@ -1092,7 +1092,8 @@ public class MainActivity extends Activity implements Catalog.Listener {
             View f = getCurrentFocus();
             if (f != null && inside(f, settingsBody) && !(f instanceof EditText)) {
                 View next = android.view.FocusFinder.getInstance().findNextFocus((ViewGroup) settingsBody, f, View.FOCUS_RIGHT);
-                if (next != null && sameLine(f, next)) next.requestFocus();
+                // unless the page sends it somewhere on purpose (a panel beside it, higher up)
+                if (next != null && (sameLine(f, next) || f.getNextFocusRightId() == next.getId())) next.requestFocus();
                 return true;
             }
         }
