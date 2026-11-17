@@ -580,6 +580,7 @@ public class MainActivity extends Activity {
             t.setCompoundDrawableTintList(ColorStateList.valueOf(fg));
             t.setBackground(has ? rounded(Color.WHITE, dp(20)) : glass);
             if (compact) pillText(t, has, t.getContentDescription().toString());
+            if (has) unclip(v);
             v.animate().scaleX(has ? 1.06f : 1f).scaleY(has ? 1.06f : 1f).setDuration(140).start();
         });
         t.setBackground(glass);
@@ -590,6 +591,22 @@ public class MainActivity extends Activity {
             t.setCompoundDrawablePadding(dp(8));
         }
         return t;
+    }
+
+    /**
+     * lets a view that grows on focus draw past its layouts' edges instead of being cut: the
+     * layouts around it stop clipping, up to the first one that scrolls (which must keep hiding
+     * what is scrolled away)
+     */
+    private static void unclip(View v) {
+        android.view.ViewParent p = v.getParent();
+        for (int i = 0; i < 4 && p instanceof android.view.ViewGroup; i++, p = p.getParent()) {
+            android.view.ViewGroup g = (android.view.ViewGroup) p;
+            if (g instanceof android.widget.ScrollView || g instanceof android.widget.HorizontalScrollView
+                    || g instanceof android.widget.AbsListView || g.getClass().getName().contains("RecyclerView")) break;
+            g.setClipChildren(false);
+            g.setClipToPadding(false);
+        }
     }
 
     /** the Wi-Fi button: the network's name while focused, and "Hors ligne" always when offline */

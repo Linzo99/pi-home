@@ -72,6 +72,22 @@ final class Ui {
         v.setRenderEffect(android.graphics.RenderEffect.createBlurEffect(radiusPx, radiusPx, android.graphics.Shader.TileMode.CLAMP));
     }
 
+    /**
+     * lets a view that grows on focus draw past its layouts' edges instead of being cut: the
+     * layouts around it stop clipping, up to the first one that scrolls (which must keep hiding
+     * what is scrolled away)
+     */
+    static void unclip(View v) {
+        android.view.ViewParent p = v.getParent();
+        for (int i = 0; i < 4 && p instanceof android.view.ViewGroup; i++, p = p.getParent()) {
+            android.view.ViewGroup g = (android.view.ViewGroup) p;
+            if (g instanceof android.widget.ScrollView || g instanceof android.widget.HorizontalScrollView
+                    || g instanceof android.widget.AbsListView || g.getClass().getName().contains("RecyclerView")) break;
+            g.setClipChildren(false);
+            g.setClipToPadding(false);
+        }
+    }
+
     static GradientDrawable outline(int stroke, int width, float radiusPx) {
         GradientDrawable g = new GradientDrawable();
         g.setColor(Color.TRANSPARENT);
@@ -116,6 +132,7 @@ final class Ui {
         style.run();
         b.setOnFocusChangeListener((v, has) -> {
             style.run();
+            if (has) unclip(v);
             v.animate().scaleX(has ? 1.05f : 1f).scaleY(has ? 1.05f : 1f).setDuration(120).start();
         });
         b.setOnClickListener(click);
