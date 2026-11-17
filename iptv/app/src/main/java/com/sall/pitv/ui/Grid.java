@@ -9,7 +9,9 @@ import com.sall.pitv.data.*;
 import com.sall.pitv.net.*;
 
 import android.content.Context;
+import android.graphics.Rect;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
@@ -39,6 +41,8 @@ public final class Grid extends RecyclerView {
     private final GridLayoutManager layout;
     private final int cardW, gap;
     private boolean loading, ended;
+    /** a Down pressed on the last row while the next titles were coming: from this position */
+    private int pendingFrom = -1;
     /** told how many titles the page holds, and whether more are coming */
     Runnable changed;
 
@@ -51,7 +55,19 @@ public final class Grid extends RecyclerView {
         add(first);
         cardW = a.dp(104);
         gap = a.dp(14);
-        layout = new GridLayoutManager(a, 6);
+        layout = new GridLayoutManager(a, 6) {
+            // the highlighted row always comes to the same place, the top: each move scrolls by
+            // exactly one row, instead of Android's "just enough to show it"
+            @Override
+            public boolean requestChildRectangleOnScreen(@NonNull RecyclerView parent, @NonNull View child, @NonNull Rect rect,
+                                                         boolean immediate, boolean focusedChildVisible) {
+                int dy = child.getTop() - align();
+                if (dy == 0) return false;
+                if (immediate) parent.scrollBy(0, dy);
+                else parent.smoothScrollBy(0, dy);
+                return true;
+            }
+        };
         setLayoutManager(layout);
         setClipToPadding(false);
         setClipChildren(false);
@@ -61,6 +77,44 @@ public final class Grid extends RecyclerView {
         setAdapter(new Cards());
         // too short to fill the screen: ask for the next ones at once
         if (items.size() < 40) more();
+    }
+
+    /** where the highlighted row's top sits: under the top padding, room left for its growth */
+    private int align() {
+        return getPaddingTop() + a.dp(8);
+    }
+
+    /** puts the highlight on [pos], bringing its row up first when it isn't laid out yet */
+    private void go(int pos) {
+        View v = layout.findViewByPosition(pos);
+        if (v != null) {
+            v.requestFocus();
+            return;
+        }
+        layout.scrollToPositionWithOffset(pos - pos % layout.getSpanCount(), align());
+        post(() -> {
+            View w = layout.findViewByPosition(pos);
+            if (w != null) w.requestFocus();
+        });
+    }
+
+    /** Down and Up: straight to the card above or below, in the same column */
+    private boolean move(int pos, boolean down) {
+        int span = layout.getSpanCount(), t = pos + (down ? span : -span);
+        if (t < 0) return false;
+        if (t >= items.size()) {
+            // the next titles are coming: the move waits for them rather than losing the highlight
+            if (!ended) {
+                pendingFrom = pos;
+                more();
+                return true;
+            }
+            // the last row, shorter: its last card, if it is below
+            t = items.size() - 1;
+            if (t / span == pos / span) return true;
+        }
+        go(t);
+        return true;
     }
 
     int count() {
@@ -109,6 +163,11 @@ public final class Grid extends RecyclerView {
             if (n == 0) ended = true;
             else getAdapter().notifyItemRangeInserted(from, n);
             if (changed != null) changed.run();
+            // a Down pressed meanwhile: carried out now, if the highlight hasn't moved since
+            int p = pendingFrom;
+            pendingFrom = -1;
+            View f = getFocusedChild();
+            if (p >= 0 && f != null && getChildAdapterPosition(f) == p) post(() -> move(p, true));
         });
     }
 
@@ -132,6 +191,10 @@ public final class Grid extends RecyclerView {
             h.itemView.setOnClickListener(v -> cb.onClick(o));
             h.itemView.setOnKeyListener((v, key, e) -> {
                 if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
+                if (key == KeyEvent.KEYCODE_DPAD_DOWN || key == KeyEvent.KEYCODE_DPAD_UP) {
+                    int at = h.getBindingAdapterPosition();
+                    return at != NO_POSITION && move(at, key == KeyEvent.KEYCODE_DPAD_DOWN);
+                }
                 if (key == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || key == KeyEvent.KEYCODE_MEDIA_PAUSE || key == KeyEvent.KEYCODE_MENU) {
                     cb.onMenu(o);
                     return true;
@@ -143,7 +206,8 @@ public final class Grid extends RecyclerView {
                 if (!has) return;
                 cb.onFocus(o);
                 // three rows from the end: the next page, so it's there before the highlight
-                if (pos >= items.size() - layout.getSpanCount() * 3) more();
+                int at = h.getBindingAdapterPosition();
+                if (at >= items.size() - layout.getSpanCount() * 3) more();
             });
         }
 
