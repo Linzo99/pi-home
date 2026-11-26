@@ -1,12 +1,17 @@
 #!/system/bin/sh
 # LG SimpLink bridge: answers LG's vendor handshake (as libcec's CSLCommandHandler does)
 # and feeds the TV remote's keys into a virtual uinput remote.
+# the HDMI input the Pi is plugged into, as the TV's EDID gives it (2.0.0.0 = input 2):
+# read again before each announce, so moving the cable to another input keeps the remote
 PA=3.0.0.0
+pa() { p=$(cec-ctl -d0 2>/dev/null | sed -n 's/.*Physical Address *: *\([0-9a-f.]*\).*/\1/p' | head -1)
+  [ -n "$p" ] && [ "$p" != f.f.f.f ] && PA=$p; }
+pa
 DIR=/data/local/tmp
 FIFO=$DIR/slb.fifo
 LOG=$DIR/slb.log
 cec() { cec-ctl -d0 "$@" >/dev/null 2>&1; }
-activate() { cec --to 0 --image-view-on; cec --to 15 --active-source phys-addr=$PA; cec --to 0 --menu-status menu-state=activated; }
+activate() { pa; cec --to 0 --image-view-on; cec --to 15 --active-source phys-addr=$PA; cec --to 0 --menu-status menu-state=activated; }
 
 # CEC UI command -> Linux key code
 lk() {
@@ -93,6 +98,7 @@ while :; do
     [ "$(cmd network_time_update_service force_refresh 2>/dev/null)" = true ] && synced=1
   fi
   if [ $((tick % 120)) -eq 0 ]; then
+    pa
     cec --to 15 --report-physical-addr phys-addr=$PA,prim-devtype=record
     cec --to 15 --device-vendor-id vendor-id=0x00e091
   fi
@@ -115,6 +121,8 @@ while :; do
         echo serial0-0 > /sys/bus/serial/drivers/hci_uart_bcm/bind; sleep 3
         start vendor.bluetooth-rpi; sleep 2
         cmd bluetooth_manager enable) &;;
+    # Pi Home's recent apps: "Tout fermer", or Up on one app
+    "stop "*) for p in ${r#stop }; do am force-stop "$p"; done;;
     # Pi Home's app updates: APKs it downloaded into its own files, installed in the background
     "install "*) (for f in ${r#install }; do
         echo "$(date) $f" >> $INSTLOG
