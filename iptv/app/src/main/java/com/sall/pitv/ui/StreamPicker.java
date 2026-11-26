@@ -75,7 +75,9 @@ public final class StreamPicker {
     /** how the links are ordered: by quality, by language, or by source; kept for next time */
     private static final String[] SORTS = {"Qualité", "Langue", "Source"};
     private int sort;
-    private final TextView sortButton;
+    /** the other way round: lightest first, the preferred language last, Z to A */
+    private boolean reversed;
+    private final TextView sortButton, orderButton;
 
     StreamPicker(MainActivity a, String title, Pick pick) {
         this.a = a;
@@ -112,10 +114,19 @@ public final class StreamPicker {
         h.setText(title);
         top.addView(h, new LinearLayout.LayoutParams(0, -2, 1f));
         sort = Math.max(0, Math.min(SORTS.length - 1, a.getSharedPreferences("player", android.content.Context.MODE_PRIVATE).getInt("pickSort", 0)));
+        reversed = a.getSharedPreferences("player", android.content.Context.MODE_PRIVATE).getBoolean("pickReversed", false);
+        orderButton = Ui.button(a, 0, orderName(), v -> {
+            reversed = !reversed;
+            a.getSharedPreferences("player", android.content.Context.MODE_PRIVATE).edit().putBoolean("pickReversed", reversed).apply();
+            ((TextView) v).setText(orderName());
+            showLinks();
+        });
+        top.addView(orderButton, Ui.margins(-2, -2, 0, 0, a.dp(10), 0));
         sortButton = Ui.button(a, 0, "Trier : " + SORTS[sort], v -> {
             sort = (sort + 1) % SORTS.length;
             a.getSharedPreferences("player", android.content.Context.MODE_PRIVATE).edit().putInt("pickSort", sort).apply();
             ((TextView) v).setText("Trier : " + SORTS[sort]);
+            orderButton.setText(orderName());
             showLinks();
         });
         top.addView(sortButton);
@@ -141,7 +152,7 @@ public final class StreamPicker {
         cols.addView(scroll(linkList), lp);
 
         TextView hint = Ui.line(a, 11, Ui.FAINT, false);
-        hint.setText("Haut : trier   ·   Haut / bas : choisir une source   ·   Droite : ses liens   ·   OK : lire (Retour y revient)   ·   Retour : fermer");
+        hint.setText("Haut : trier et ordre   ·   Haut / bas : choisir une source   ·   Droite : ses liens   ·   OK : lire (Retour y revient)   ·   Retour : fermer");
         col.addView(hint, Ui.margins(-1, -2, 0, a.dp(12), 0, 0));
 
         dialog.setContentView(root);
@@ -378,10 +389,30 @@ public final class StreamPicker {
     private List<Addons.Stream> shownStreams() {
         Source s = sources.get(selected);
         List<Addons.Stream> l = new ArrayList<>(selected.equals(ALL) || s == null ? all : s.streams);
-        // the lists are already best quality first: the other orders keep it within their groups
-        if (sort == 1) l.sort(Comparator.comparingInt(this::languageRank));
-        else if (sort == 2) l.sort(Comparator.comparing((Addons.Stream x) -> x.addon == null ? "" : x.addon.toLowerCase(java.util.Locale.ROOT)));
+        // the lists are already best quality first: the other orders keep it within their groups;
+        // what has no quality or language stays at the end either way
+        if (sort == 0 && reversed) l.sort(Comparator.comparingInt((Addons.Stream x) -> x.quality() == 0 ? 99 : x.quality()));
+        else if (sort == 1) l.sort(Comparator.comparingInt((Addons.Stream x) -> {
+            int r = languageRank(x);
+            return r == 99 ? 999 : reversed ? -r : r;
+        }));
+        else if (sort == 2) {
+            Comparator<Addons.Stream> byName = Comparator.comparing((Addons.Stream x) -> x.addon == null ? "" : x.addon.toLowerCase(java.util.Locale.ROOT));
+            l.sort(reversed ? byName.reversed() : byName);
+        }
         return l;
+    }
+
+    /** the order button's label, for the sort chosen */
+    private String orderName() {
+        switch (sort) {
+            case 1:
+                return reversed ? "↑  Préférée en dernier" : "↓  Préférée d'abord";
+            case 2:
+                return reversed ? "Z → A" : "A → Z";
+            default:
+                return reversed ? "↑  Plus légère d'abord" : "↓  Meilleure d'abord";
+        }
     }
 
     /** the language chosen last in the player first, then French, then the rest; unknown last */

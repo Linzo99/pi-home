@@ -81,13 +81,13 @@ public final class Ui {
     }
 
     /**
-     * lets a view that grows on focus draw past its layouts' edges instead of being cut: the
-     * layouts around it stop clipping, up to the first one that scrolls (which must keep hiding
-     * what is scrolled away)
+     * lets a view that grows on focus draw past its layouts' edges instead of being cut: the two
+     * layouts around it stop clipping, not the page (a cropped picture on it would spill), nor a
+     * layout that scrolls (it must keep hiding what is scrolled away)
      */
     static void unclip(View v) {
         android.view.ViewParent p = v.getParent();
-        for (int i = 0; i < 4 && p instanceof android.view.ViewGroup; i++, p = p.getParent()) {
+        for (int i = 0; i < 2 && p instanceof android.view.ViewGroup; i++, p = p.getParent()) {
             android.view.ViewGroup g = (android.view.ViewGroup) p;
             if (g instanceof android.widget.ScrollView || g instanceof android.widget.HorizontalScrollView
                     || g instanceof android.widget.AbsListView || g.getClass().getName().contains("RecyclerView")) break;

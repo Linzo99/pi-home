@@ -55,6 +55,8 @@ public final class DetailsView {
 
         bd = new ImageView(a);
         bd.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        // a cropped picture draws past its box unless clipped: keep it in, whatever the page clips
+        bd.setCropToPadding(true);
         int w = a.getResources().getDisplayMetrics().widthPixels * 75 / 100, h = a.getResources().getDisplayMetrics().heightPixels * 85 / 100;
         bdW = w;
         bdH = h;

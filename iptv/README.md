@@ -32,7 +32,9 @@ episodes.
 
 On the Sources page, « Trier » (up from the list) orders the links by quality, by language (the
 one chosen in the player first, then VF, MULTI, VOSTFR, VO) or by source, best quality first in
-each group; the order is kept for next time. Each link shows its language and quality at the right.
+each group; the button beside it turns the order round (lightest first, the preferred language
+last, Z to A), links without a quality or language staying at the end. Both are kept for next time.
+Each link shows its language and quality at the right.
 
 On Pi Home, highlighting Pi TV shows its row: the films and episodes of Continuer à regarder,
 then the recent channels. Choosing one opens Pi TV on it: a film's page, ready to resume, or the
