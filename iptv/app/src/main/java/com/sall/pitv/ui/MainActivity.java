@@ -662,7 +662,7 @@ public class MainActivity extends Activity implements Catalog.Listener {
                 // the collections, near the top as in Nuvio
                 r.addAll(shelfRows());
                 r.add(new Rows.Row("Chaînes regardées récemment", Rows.CHANNEL, lib.recentLive()));
-                r.add(new Rows.Row("Ma liste", Rows.POSTER, notAdultItems(merge(lib.favs(Model.MOVIE), lib.favs(Model.SERIES)))));
+                // Ma liste has its own page in the menu: not repeated here
                 r.add(new Rows.Row("Films ajoutés récemment", Rows.POSTER, Catalog.recent(cat.allMovies, 30)));
                 r.add(new Rows.Row("Séries ajoutées récemment", Rows.POSTER, Catalog.recent(cat.allSeries, 30)));
                 // the first catalogue of each add-on kind
