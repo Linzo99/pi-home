@@ -45,29 +45,59 @@ connected to HDMI 3 of an LG TV. How it works inside, the Pi tweaks and troubles
 
 | | |
 |---|---|
-| **Top left** | Greeting (Bonjour, Bon après-midi, Bonsoir), weather, next prayer, CPU and RAM use |
-| **Top right** | Now playing (when something plays in the background), Wi-Fi (the network's name when highlighted, "Hors ligne" when offline), 🌙 Veille, ⚙ Paramètres, clock |
-| **Title** | Name of the highlighted app, or of the highlighted video |
-| **Dock** | Your first 4 apps |
-| **Row** | Content from the highlighted app |
-| **Toutes les apps** | Every other app, plus the hidden ones |
+| | |
+|---|---|
+| **Background** | A landscape from Wikimedia Commons' featured pictures of lakes and mountains (or Bing's photo of the day), a new one every 6 hours, kept for offline starts; its author and licence at the bottom left |
+| **Middle** | Greeting, date and weather over a large glass clock, then the next prayer |
+| **Top right** | Now playing (when something plays in the background), ⬆ updates, 🌙 the sleep timer's time left, "Hors ligne" when offline, then 🔍 search and the control panel |
+| **Dock** | Your apps as rounded square icons (4 at first, up to 8), the highlighted one's name in a bubble over it, and ▦ Toutes les apps at the end |
 
-The background glows in the colour of the highlighted app. From 23:00 to 06:00 the screen dims.
+From 23:00 to 06:00 the screen dims.
 
-The dock, the buttons, the CPU/RAM chips and the menus are frosted glass: each shows a blurred
-copy of what is behind it (the glow and the highlighted video's artwork; the whole screen, for a
-menu) under a light tint, with a sheen and a bright rim. The blur is made once each time the
-background changes, on a picture a tenth of the screen's size, so it costs nothing while moving
-around.
+The clock's digits are glass too: filled with a blurred, brightened copy of the photo, under a
+frost that whitens toward their foot and a bright outline, in Antonio Light.
 
-### A row that follows the app
+**Photo** in the control panel shows the next photo now, or switches between the Commons
+landscapes and Bing's photo of the day. The Commons pictures are freely licensed (mostly
+CC BY-SA); the credit line names the photographer and the licence, as they require.
 
-The row under the dock shows what the highlighted app publishes: SmartTube's recommendations,
-Nuvio's films and episodes in progress. Apps that publish nothing show everyone's
-"Continuer à regarder" instead, leaving out the apps you've hidden.
+The dock, the buttons, the cards and the windows are frosted glass: each shows a blurred copy of
+what is behind it (the photo; the whole screen, for a window), more vivid than the original, under
+a tint that darkens over bright parts and frosts over dark ones, with a magnified band along the
+edge as thick glass bends light, a sheen, and a rim lit at two corners. The blur is made once each time the background changes,
+on a picture a tenth of the screen's size, so it costs nothing while moving around.
 
-Move down onto a card and its artwork fills the top of the screen. OK opens it directly in the
-app. Films and episodes in progress also show the time left.
+### Content above the app
+
+When the highlighted app has something to show, "▲ SmartTube · Recommandé" (or the like) appears
+over the dock. **Up** brings it in, under the clock, as a row of glass cards (picture, app, title,
+time left and progress): SmartTube's recommendations, Nuvio's and
+Pi TV's films and episodes in progress, Pi TV's recent channels. Apps that publish nothing show
+everyone's "Continuer à regarder" instead, leaving out the apps you've hidden.
+
+OK opens a card directly in the app. **Down** or **Back** returns to the dock.
+
+### Reprendre, for every app
+
+Pi Home follows what every app plays through its media session (the same way it shows "now
+playing") and keeps the title, the picture and where it stopped, for anything longer than five
+minutes. Those come first in the app's row ("Apple TV · Reprendre"), and in the row of apps that
+publish nothing. OK goes back to the player's own screen when Android still has it, else it opens
+the app. A programme watched to the end is dropped; the rest after 30 days.
+
+### Recent apps
+
+**Home twice** (or Récentes in the control panel): the apps used this week, latest first. OK opens
+one; **Up** closes it (the root bridge force-stops it, so even audio playing in the background
+stops); "Tout fermer" closes them all. Needs usage access, granted once with
+`adb shell appops set com.sall.pihome GET_USAGE_STATS allow`.
+
+### Search
+
+🔍 at the top right: a keyboard over the blurred screen. As letters are typed, matching apps and
+Pi Home's own actions (Wi-Fi, Bluetooth, Infos Pi, sleep, restart, photo…) list on the right,
+accents ignored. From two letters, the words can be sent to Pi TV (its Search page opens with
+them) or to SmartTube.
 
 ### Now playing
 
@@ -80,47 +110,55 @@ with the title appears in the top bar. OK on it pauses or resumes.
 
 Press **Pause** on an app to open its menu.
 
-- **Déplacer**: the app gets a blue frame; move it with the arrows, OK to drop it. The first 4
-  apps make the dock.
+- **Déplacer**: the app gets a blue frame; move it with the arrows, OK to drop it. A dock app
+  moves within the dock, an app of Toutes les apps within that window.
+- **Ajouter au dock** / **Retirer du dock**: up to 8 apps in the dock.
 - **Masquer**: hides it from the home screen.
 - **Renommer**: gives it another name. "Nom d'origine" restores the original.
 - **Infos de l'app**: Android's page for the app (storage, permissions, force stop).
 
-Hidden apps go into an **Apps masquées** tile at the end of the grid, behind a 4-digit code: the
+Hidden apps go into a **Masquées** tile at the end of Toutes les apps, behind a 4-digit code: the
 first time, OK on the tile asks you to choose one. After the code, each hidden app can be opened
 or shown again, and the code changed. Type it with the on-screen keypad or the remote's number
 keys; it stays unlocked until you leave the home screen. Forgot it? With root:
 `adb shell "sed -i '/name=\"code\"/d' /data/data/com.sall.pihome/shared_prefs/home.xml"`, then
 restart Pi Home (`adb shell am force-stop com.sall.pihome`).
 
-New apps appear at the end of the grid by themselves.
+New apps appear at the end of Toutes les apps by themselves.
 
 ---
 
 ## Sleep, timer, restart
 
-**🌙 Veille** puts the Pi to sleep now, or in 30 min, 1 h or 2 h. While a timer runs, the button
-shows the time left, and its menu adds "Annuler la minuterie". Any button on the remote wakes
+**Minuterie de veille** (in the control panel) puts the Pi to sleep now, or in 30 min, 1 h or
+2 h. While a timer runs, a 🌙 button in the top bar shows the time left, and its menu adds
+"Annuler la minuterie". **Veille** at the bottom of the panel puts it to sleep at once. Any button on the remote wakes
 the Pi.
 
 After midnight, if nothing has been touched for an hour, the Pi goes to sleep by itself.
 
 ---
 
-## Paramètres and Infos Pi
+## The control panel
 
-- **Paramètres Android**: the usual Android TV settings.
+Up from the dock, then OK on the button at the top right: a glass panel slides in.
+
+- **Réseau**: the Wi-Fi network (or "Hors ligne"); OK opens Android's network settings.
+- **Bluetooth**: on or off; OK opens Android's Bluetooth settings (pairing a headset).
+- **Mémoire**: RAM and CPU use, live; OK opens Infos Pi.
+- **Paramètres**: the usual Android TV settings.
+- **Photo**: the next home photo, or where they come from.
 - **Infos Pi**: processor temperature, free memory and storage, IP address, time since the last
   restart, and the data used today and this month with the 3 apps that used the most. Refreshes
   every 2 seconds; Android only saves data figures about every 30 minutes. Up to about 75 °C is normal; the Pi slows itself down from
   80 °C.
-- **Rechercher des mises à jour**: checks SmartTube and Nuvio now (see below).
-- **Redémarrer le Bluetooth**: when Bluetooth stops working. The Pi's Bluetooth chip sometimes
+- **Mises à jour**: what is available, or checks SmartTube and Nuvio now (see below).
+- **Réparer le Bluetooth**: when Bluetooth stops working. The Pi's Bluetooth chip sometimes
   reports a hardware error; Android then crashes a few times in a row and gives up, leaving
   Bluetooth off. This resets the chip itself (its driver is unbound and bound again, which powers
   it off and on and reloads its firmware), then starts Android's Bluetooth again. Takes about 15
   seconds; paired devices reconnect by themselves.
-- **Redémarrer le Pi**: restarts the Pi, after a confirmation.
+- **Redémarrer**: restarts the Pi, after a confirmation.
 
 ---
 
@@ -242,7 +280,7 @@ updates must use the same keys. They're deliberately left out of Git.
 
 | Path | What it is |
 |---|---|
-| `src/com/sall/pihome/` | The launcher. `MainActivity` is the home screen; `WatchNext`, `Weather`, `Prayers`, `Updates`, `PiInfo` fetch its data; `ClockDream` is the screensaver; `GlowView` draws the glow; `Glass` the frosted panels |
+| `src/com/sall/pihome/` | The launcher. `MainActivity` is the home screen; `WatchNext`, `Weather`, `Prayers`, `Updates`, `PiInfo` fetch its data; `ClockDream` is the screensaver; `GlowView` draws the glow; `Glass` the frosted panels; `Wallpaper` fetches the home photo; `Resume` remembers what apps play; `GlassClock` draws the clock; `Icons` draws each app's square icon; `Bubble` the name bubble |
 | `res/` | Icons and the theme |
 | `AndroidManifest.xml` | Permissions, the home screen and the screensaver |
 | `bridge/lg-simplink.sh` | The LG remote bridge, which also carries out sleep, restart, installs and the Bluetooth reset |
@@ -252,3 +290,15 @@ updates must use the same keys. They're deliberately left out of Git.
 | `iptv/` | Pi TV, the IPTV player, a separate app built with Gradle; see its [README](iptv/README.md) |
 | `build.sh`, `setup.sh` | Build, and install on a fresh Pi |
 | `docs/` | This guide's screenshots and [HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) |
+
+---
+
+## Credits
+
+The glass recipe (saturation, lens band, adaptive tint, diagonal rim), the square-icon builder, the
+dark focus frame on light icons, the name bubble, the glass clock and the focus timings are adapted from
+[tvOS Launcher](https://github.com/techgenius1/tvOS-Launcher) by techgenius1, Apache License 2.0.
+
+The clock font is [Antonio](https://github.com/googlefonts/antonioFont) (`res/font/antonio.ttf`),
+SIL Open Font License 1.1, see `OFL-Antonio.txt`. Home photos come from Wikimedia Commons under
+their authors' licences, shown with each photo.

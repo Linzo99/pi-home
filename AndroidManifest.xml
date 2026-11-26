@@ -18,6 +18,8 @@
     <uses-permission android:name="android.permission.MEDIA_CONTENT_CONTROL" />
     <!-- data usage in Infos Pi (NetworkStatsManager for every app); privileged, also whitelisted -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+    <!-- a normal permission (not privileged): closing apps from the recent-apps row -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
     <!-- the prayer reminder banner, shown over other apps -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- the navigation sounds switch -->

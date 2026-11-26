@@ -27,6 +27,8 @@ final class WatchNext {
 
     static final class Item {
         String pkg, title, subtitle, poster, intentUri;
+        /** set for the entries Pi Home recorded itself (Resume) */
+        String resumeKey;
         long position, duration;
         int color;
     }
