@@ -774,10 +774,24 @@
           },
           {
             "type": "movie",
+            "genre": "Action",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
+            "type": "movie",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.movie.genres.adventure"
+          },
+          {
+            "type": "movie",
+            "genre": "Adventure",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           },
           {
             "type": "series",
@@ -785,6 +799,13 @@
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.action-adventure"
+          },
+          {
+            "type": "series",
+            "genre": "Action & Adventure",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -802,12 +823,30 @@
           {
             "type": "movie",
             "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Action"
+          },
+          {
+            "type": "movie",
+            "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.movie.genres.adventure"
+          },
+          {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Adventure"
           },
           {
             "type": "series",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.action-adventure"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Action & Adventure"
           }
         ],
         "focusGifEnabled": true,
@@ -825,11 +864,25 @@
             "catalogId": "tmdb.discover.movie.genres.animation"
           },
           {
+            "type": "movie",
+            "genre": "Animation",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
             "type": "series",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.animation"
+          },
+          {
+            "type": "series",
+            "genre": "Animation",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -845,9 +898,21 @@
             "catalogId": "tmdb.discover.movie.genres.animation"
           },
           {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Animation"
+          },
+          {
             "type": "series",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.animation"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Animation"
           }
         ],
         "focusGifEnabled": true,
@@ -1073,11 +1138,25 @@
             "catalogId": "tmdb.discover.movie.genres.comedy"
           },
           {
+            "type": "movie",
+            "genre": "Comedy",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
             "type": "series",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.comedy"
+          },
+          {
+            "type": "series",
+            "genre": "Comedy",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1093,9 +1172,21 @@
             "catalogId": "tmdb.discover.movie.genres.comedy"
           },
           {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Comedy"
+          },
+          {
             "type": "series",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.comedy"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Comedy"
           }
         ],
         "focusGifEnabled": true,
@@ -1113,11 +1204,25 @@
             "catalogId": "tmdb.discover.movie.genres.crime"
           },
           {
+            "type": "movie",
+            "genre": "Crime",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
             "type": "series",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.crime"
+          },
+          {
+            "type": "series",
+            "genre": "Crime",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1133,9 +1238,21 @@
             "catalogId": "tmdb.discover.movie.genres.crime"
           },
           {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Crime"
+          },
+          {
             "type": "series",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.crime"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Crime"
           }
         ],
         "focusGifEnabled": true,
@@ -1153,11 +1270,25 @@
             "catalogId": "tmdb.discover.movie.genres.documentary"
           },
           {
+            "type": "movie",
+            "genre": "Documentary",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
             "type": "series",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.documentary"
+          },
+          {
+            "type": "series",
+            "genre": "Documentary",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1173,9 +1304,21 @@
             "catalogId": "tmdb.discover.movie.genres.documentary"
           },
           {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Documentary"
+          },
+          {
             "type": "series",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.documentary"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Documentary"
           }
         ],
         "focusGifEnabled": true,
@@ -1193,11 +1336,25 @@
             "catalogId": "tmdb.discover.movie.genres.drama"
           },
           {
+            "type": "movie",
+            "genre": "Drama",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
             "type": "series",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.drama"
+          },
+          {
+            "type": "series",
+            "genre": "Drama",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1213,9 +1370,21 @@
             "catalogId": "tmdb.discover.movie.genres.drama"
           },
           {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Drama"
+          },
+          {
             "type": "series",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.drama"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Drama"
           }
         ],
         "focusGifEnabled": true,
@@ -1233,11 +1402,25 @@
             "catalogId": "tmdb.discover.movie.genres.family"
           },
           {
+            "type": "movie",
+            "genre": "Family",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
             "type": "series",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.kids"
+          },
+          {
+            "type": "series",
+            "genre": "Kids",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1253,9 +1436,21 @@
             "catalogId": "tmdb.discover.movie.genres.family"
           },
           {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Family"
+          },
+          {
             "type": "series",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.kids"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Kids"
           }
         ],
         "focusGifEnabled": true,
@@ -1273,11 +1468,25 @@
             "catalogId": "tmdb.discover.movie.genres.fantasy"
           },
           {
+            "type": "movie",
+            "genre": "Fantasy",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
             "type": "series",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.sci-fi-fantasy"
+          },
+          {
+            "type": "series",
+            "genre": "Sci-Fi & Fantasy",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1293,9 +1502,21 @@
             "catalogId": "tmdb.discover.movie.genres.fantasy"
           },
           {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Fantasy"
+          },
+          {
             "type": "series",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.sci-fi-fantasy"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Sci-Fi & Fantasy"
           }
         ],
         "focusGifEnabled": true,
@@ -1313,11 +1534,25 @@
             "catalogId": "tmdb.discover.movie.genres.science-fiction"
           },
           {
+            "type": "movie",
+            "genre": "Science Fiction",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
             "type": "series",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.sci-fi-fantasy"
+          },
+          {
+            "type": "series",
+            "genre": "Sci-Fi & Fantasy",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1333,9 +1568,21 @@
             "catalogId": "tmdb.discover.movie.genres.science-fiction"
           },
           {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Science Fiction"
+          },
+          {
             "type": "series",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.sci-fi-fantasy"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Sci-Fi & Fantasy"
           }
         ],
         "focusGifEnabled": true,
@@ -1354,10 +1601,24 @@
           },
           {
             "type": "movie",
+            "genre": "History",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
+            "type": "movie",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.movie.genres.war"
+          },
+          {
+            "type": "movie",
+            "genre": "War",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           },
           {
             "type": "series",
@@ -1365,6 +1626,13 @@
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.war-politics"
+          },
+          {
+            "type": "series",
+            "genre": "War & Politics",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1382,12 +1650,30 @@
           {
             "type": "movie",
             "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "History"
+          },
+          {
+            "type": "movie",
+            "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.movie.genres.war"
+          },
+          {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "War"
           },
           {
             "type": "series",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.war-politics"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "War & Politics"
           }
         ],
         "focusGifEnabled": true,
@@ -1403,6 +1689,13 @@
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.movie.genres.horror"
+          },
+          {
+            "type": "movie",
+            "genre": "Horror",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1416,6 +1709,12 @@
             "type": "movie",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.movie.genres.horror"
+          },
+          {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Horror"
           }
         ],
         "focusGifEnabled": true,
@@ -1431,6 +1730,13 @@
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.movie.genres.music"
+          },
+          {
+            "type": "movie",
+            "genre": "Music",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1444,6 +1750,12 @@
             "type": "movie",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.movie.genres.music"
+          },
+          {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Music"
           }
         ],
         "focusGifEnabled": true,
@@ -1461,11 +1773,25 @@
             "catalogId": "tmdb.discover.movie.genres.mystery"
           },
           {
+            "type": "movie",
+            "genre": "Mystery",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
             "type": "series",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.mystery"
+          },
+          {
+            "type": "series",
+            "genre": "Mystery",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1481,9 +1807,21 @@
             "catalogId": "tmdb.discover.movie.genres.mystery"
           },
           {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Mystery"
+          },
+          {
             "type": "series",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.mystery"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Mystery"
           }
         ],
         "focusGifEnabled": true,
@@ -1502,10 +1840,24 @@
           },
           {
             "type": "series",
+            "genre": "News",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
+            "type": "series",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.talk"
+          },
+          {
+            "type": "series",
+            "genre": "Talk",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1523,7 +1875,19 @@
           {
             "type": "series",
             "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "News"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.talk"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Talk"
           }
         ],
         "focusGifEnabled": true,
@@ -1542,10 +1906,24 @@
           },
           {
             "type": "series",
+            "genre": "Reality",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
+            "type": "series",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.soap"
+          },
+          {
+            "type": "series",
+            "genre": "Soap",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1563,7 +1941,19 @@
           {
             "type": "series",
             "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Reality"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.soap"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Soap"
           }
         ],
         "focusGifEnabled": true,
@@ -1579,6 +1969,13 @@
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.movie.genres.romance"
+          },
+          {
+            "type": "movie",
+            "genre": "Romance",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1592,6 +1989,12 @@
             "type": "movie",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.movie.genres.romance"
+          },
+          {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Romance"
           }
         ],
         "focusGifEnabled": true,
@@ -1607,6 +2010,13 @@
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.movie.genres.thriller"
+          },
+          {
+            "type": "movie",
+            "genre": "Thriller",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1620,6 +2030,12 @@
             "type": "movie",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.movie.genres.thriller"
+          },
+          {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Thriller"
           }
         ],
         "focusGifEnabled": true,
@@ -1635,6 +2051,13 @@
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.movie.genres.tv-movie"
+          },
+          {
+            "type": "movie",
+            "genre": "TV Movie",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1648,6 +2071,12 @@
             "type": "movie",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.movie.genres.tv-movie"
+          },
+          {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "TV Movie"
           }
         ],
         "focusGifEnabled": true,
@@ -1665,11 +2094,25 @@
             "catalogId": "tmdb.discover.movie.genres.western"
           },
           {
+            "type": "movie",
+            "genre": "Western",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
+          },
+          {
             "type": "series",
             "genre": "",
             "addonId": "aio-metadata",
             "provider": "addon",
             "catalogId": "tmdb.discover.series.genres.western"
+          },
+          {
+            "type": "series",
+            "genre": "Western",
+            "addonId": "aio-metadata",
+            "provider": "addon",
+            "catalogId": "tmdb.top_rated"
           }
         ],
         "hideTitle": false,
@@ -1685,9 +2128,21 @@
             "catalogId": "tmdb.discover.movie.genres.western"
           },
           {
+            "type": "movie",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Western"
+          },
+          {
             "type": "series",
             "addonId": "aio-metadata",
             "catalogId": "tmdb.discover.series.genres.western"
+          },
+          {
+            "type": "series",
+            "addonId": "aio-metadata",
+            "catalogId": "tmdb.top_rated",
+            "genre": "Western"
           }
         ],
         "focusGifEnabled": true,

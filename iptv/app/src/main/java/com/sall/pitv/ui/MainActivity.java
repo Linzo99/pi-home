@@ -961,7 +961,12 @@ public class MainActivity extends Activity implements Catalog.Listener {
                 pending[0]--;
                 // Netflix's films and Netflix's series: the same name twice, told apart by kind
                 String kind = "movie".equals(src[1]) ? "Films" : "anime".equals(src[1]) ? "Animes" : "Séries";
-                if (row != null) slots[at] = new Rows.Row(row.name + "  ·  " + kind, Rows.POSTER, row.items).all(row);
+                // the same catalogue twice in a folder (Top Rated for Action, then for Adventure):
+                // its genre tells them apart
+                int same = 0;
+                for (String[] o : d.sources) if (o[1].equals(src[1]) && o[2].equals(src[2])) same++;
+                String name = row == null ? "" : same > 1 && !src[3].isEmpty() ? row.name + "  ·  " + src[3] : row.name;
+                if (row != null) slots[at] = new Rows.Row(name + "  ·  " + kind, Rows.POSTER, row.items).all(row);
                 boolean first = rows.isEmpty();
                 List<Rows.Row> shown = new ArrayList<>();
                 for (Rows.Row x : slots) if (x != null) shown.add(x);
