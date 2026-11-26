@@ -1325,7 +1325,7 @@
         "coverEmoji": "🚀",
         "focusGifUrl": "https://raw.githubusercontent.com/luckynumb3rs/stremio-perfect-setup/main/collections/themes/focused/space.webp",
         "titleLogoUrl": "https://raw.githubusercontent.com/luckynumb3rs/stremio-perfect-setup/main/collections/themes/title/space.webp",
-        "coverImageUrl": "https://raw.githubusercontent.com/luckynumb3rs/stremio-perfect-setup/main/collections/themes/cover/space.webp",
+        "coverImageUrl": "https://raw.githubusercontent.com/luckynumb3rs/stremio-perfect-setup/main/collections/themes/focused/space.webp",
         "catalogSources": [
           {
             "type": "movie",
